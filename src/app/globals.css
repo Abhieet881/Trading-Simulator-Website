@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  /* Design System Theme Variables (MANDATORY Hex Codes) */
+  --font-sans: var(--font-sans), Inter, sans-serif;
+  
+  --color-brand-bg: #FFFFFF;
+  --color-brand-bg-sec: #FAFAFA;
+  --color-brand-text: #111111;
+  --color-brand-muted: #6B7280;
+  --color-brand-green: #16A34A;
+  --color-brand-red: #DC2626;
+  --color-brand-accent: #2563EB; /* Primary accent: #2563EB (blue) or #059669 (green) */
+  --color-brand-border: #E5E7EB;
+  
+  --shadow-brand-soft: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+:root {
+  --background: #FFFFFF;
+  --foreground: #111111;
+}
+
+body {
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-text);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Rounded Corner Defaults */
+.rounded-brand {
+  border-radius: 12px;
+}
+
+/* Custom Scrollbar for clean fintech look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-brand-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-brand-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-muted);
+}
