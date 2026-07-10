@@ -587,7 +587,6 @@ export default function Home() {
           <div className="flex gap-8">
             <a href="#" className="hover:text-[#111111] transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-[#111111] transition-colors">Terms of Service</a>
-            <a href="https://github.com/Abhieet881/Trading-Simulator-Website" target="_blank" className="hover:text-[#111111] transition-colors">GitHub Repository</a>
           </div>
 
           <div>
