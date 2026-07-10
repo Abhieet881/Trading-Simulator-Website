@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1",
+    "name": "Satoshi Nakamoto",
+    "email": "satoshi@bitcoin.org",
+    "created_at": "2026-07-09T13:23:04.306Z"
+  },
+  {
+    "id": "2",
+    "name": "Vitalik Buterin",
+    "email": "vitalik@ethereum.org",
+    "created_at": "2026-07-10T01:23:04.306Z"
+  },
+  {
+    "id": "3",
+    "name": "Changpeng Zhao",
+    "email": "cz@binance.com",
+    "created_at": "2026-07-10T10:23:04.306Z"
+  }
+]
