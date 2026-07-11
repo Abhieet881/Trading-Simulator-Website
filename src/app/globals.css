@@ -14,6 +14,19 @@
   --color-brand-border: #E5E7EB;
   
   --shadow-brand-soft: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+  --animate-fade-in: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 :root {

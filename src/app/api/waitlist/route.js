@@ -8,12 +8,8 @@ const filePath = path.join(process.cwd(), 'waitlist_entries.json');
 function readEntries() {
   try {
     if (!fs.existsSync(filePath)) {
-      // Seed database with mock waitlist entries
-      const initial = [
-        { id: '1', name: 'Satoshi Nakamoto', email: 'satoshi@bitcoin.org', created_at: new Date(Date.now() - 3600000 * 24).toISOString() },
-        { id: '2', name: 'Vitalik Buterin', email: 'vitalik@ethereum.org', created_at: new Date(Date.now() - 3600000 * 12).toISOString() },
-        { id: '3', name: 'Changpeng Zhao', email: 'cz@binance.com', created_at: new Date(Date.now() - 3600000 * 3).toISOString() }
-      ];
+      // Seed database with empty list
+      const initial = [];
       fs.writeFileSync(filePath, JSON.stringify(initial, null, 2));
       return initial;
     }
