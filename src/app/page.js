@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   TrendingUp, Shield, BarChart3, Users, Award, 
   ArrowRight, CheckCircle2, Play, AlertCircle, Sparkles, Mail, User
@@ -177,7 +178,7 @@ export default function Home() {
       const resizeObserver = new ResizeObserver((entries) => {
         if (entries.length === 0 || !chart) return;
         const { width } = entries[0].contentRect;
-        chart.applyOptions({ width });
+        chart.resize(width, 240);
       });
       resizeObserver.observe(chartContainerRef.current);
 
@@ -279,13 +280,20 @@ export default function Home() {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#6B7280]">
-            <a href="#problem" className="hover:text-[#111111] transition-colors">Why Paper Trading</a>
-            <a href="#features" className="hover:text-[#111111] transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-[#111111] transition-colors">How It Works</a>
-            <a href="#founder" className="hover:text-[#111111] transition-colors">Founder</a>
+            <a href="#problem" className="nav-link">Why Paper Trading</a>
+            <a href="#features" className="nav-link">Features</a>
+            <a href="#how-it-works" className="nav-link">How It Works</a>
+            <a href="#founder" className="nav-link">Founder</a>
           </nav>
 
-          <div>
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/login" 
+              className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors nav-link"
+            >
+              Log In
+            </Link>
+            <div className="h-4 w-[1px] bg-gray-200" />
             <a 
               href="#waitlist" 
               className="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-[#2563EB] hover:bg-[#1d4ed8] rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all"
@@ -809,8 +817,8 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-6">
           <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 md:p-12 shadow-[0_1px_3px_rgba(0,0,0,0.06)] grid md:grid-cols-[120px_1fr] gap-8 items-center">
             <div className="flex justify-center">
-              <div className="w-24 h-24 rounded-full bg-[#2563EB]/10 flex items-center justify-center border-2 border-[#2563EB]/30 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
-                <Award className="text-[#2563EB] w-12 h-12" />
+              <div className="w-20 h-20 rounded-full bg-[#2563EB] flex items-center justify-center border-2 border-white shadow-[0_4px_12px_rgba(37,99,235,0.18)] select-none">
+                <span className="text-white font-extrabold text-2xl tracking-wide">AP</span>
               </div>
             </div>
             <div className="text-left">

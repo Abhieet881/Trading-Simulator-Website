@@ -1,0 +1,158 @@
+import React from 'react';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
+import AdminClientPage from './AdminClientPage';
+
+export const revalidate = 0; // Disable server caching for administrative accuracy
+
+export default async function AdminPage() {
+  const supabase = await createClient();
+
+  // 1. Authenticate user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    redirect('/login');
+  }
+
+  // 2. Resolve admin privileges
+  let isAdmin = false;
+  try {
+    const { data: dbUser, error: dbUserError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (dbUser) {
+      isAdmin = dbUser.is_admin;
+    } else {
+      // Fallback check for initial setup or development environment
+      isAdmin = user.email === 'patilabhijeet409@gmail.com' || user.email === 'abhieet881@gmail.com';
+    }
+  } catch (err) {
+    console.error('Admin privilege check failed, checking fallback:', err);
+    isAdmin = user.email === 'patilabhijeet409@gmail.com' || user.email === 'abhieet881@gmail.com';
+  }
+
+  if (!isAdmin) {
+    redirect('/dashboard');
+  }
+
+  // 3. Fetch admin metrics and user lists
+  let totalUsers = 0;
+  let activeToday = 0;
+  let totalTrades = 0;
+  let totalVolume = 0.00;
+  let usersList = [];
+
+  try {
+    // A. Fetch users
+    const { data: dbUsers, error: usersErr } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    // B. Fetch trades (all users)
+    const { data: dbTrades, error: tradesErr } = await supabase
+      .from('trades')
+      .select('*');
+
+    if (usersErr) throw usersErr;
+    if (tradesErr) throw tradesErr;
+
+    if (dbUsers) {
+      totalUsers = dbUsers.length;
+      usersList = dbUsers.map(u => {
+        const userTrades = dbTrades ? dbTrades.filter(t => t.user_id === u.id) : [];
+        return {
+          ...u,
+          trade_count: userTrades.length
+        };
+      });
+    }
+
+    if (dbTrades) {
+      totalTrades = dbTrades.length;
+      totalVolume = dbTrades.reduce((sum, t) => sum + parseFloat(t.usd_amount || 0), 0);
+
+      // Active Today: distinct user_id with trades placed/closed today
+      const todayStr = new Date().toDateString();
+      const activeUsers = new Set(
+        dbTrades
+          .filter(t => {
+            const openDate = new Date(t.created_at).toDateString();
+            const closeDate = t.closed_at ? new Date(t.closed_at).toDateString() : null;
+            return openDate === todayStr || closeDate === todayStr;
+          })
+          .map(t => t.user_id)
+      );
+      activeToday = activeUsers.size;
+    }
+  } catch (err) {
+    console.warn('Supabase admin data query failed, falling back to local database:', err.message);
+    
+    // Fallback to local_db.json
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    
+    if (fs.existsSync(localDbPath)) {
+      const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+      
+      const mockUsers = Object.keys(db.wallets || {}).map((uid, index) => {
+        const userTrades = db.trades.filter(t => t.user_id === uid);
+        const savedStatus = db.user_statuses?.[uid] || 'active';
+        return {
+          id: uid,
+          name: uid === user.id ? (user.user_metadata?.name || 'Abhijeet Patil') : `Sim User ${index + 1}`,
+          email: uid === user.id ? user.email : `user${index + 1}@example.com`,
+          plan_type: uid === user.id ? 'premium' : 'free',
+          status: savedStatus,
+          is_admin: uid === user.id ? true : false,
+          created_at: new Date(Date.now() - index * 86400000 * 2.5).toISOString(),
+          trade_count: userTrades.length
+        };
+      });
+
+      usersList = mockUsers;
+      totalUsers = mockUsers.length;
+
+      if (db.trades) {
+        totalTrades = db.trades.length;
+        totalVolume = db.trades.reduce((sum, t) => sum + parseFloat(t.usd_amount || 0), 0);
+
+        const todayStr = new Date().toDateString();
+        const activeUsers = new Set(
+          db.trades
+            .filter(t => {
+              const openDate = new Date(t.created_at).toDateString();
+              const closeDate = t.closed_at ? new Date(t.closed_at).toDateString() : null;
+              return openDate === todayStr || closeDate === todayStr;
+            })
+            .map(t => t.user_id)
+        );
+        activeToday = activeUsers.size;
+      }
+    }
+  }
+
+  const initialUsers = usersList.map(u => ({
+    id: u.id,
+    name: u.name || 'User',
+    email: u.email || '—',
+    plan_type: u.plan_type || 'free',
+    status: u.status || 'active',
+    created_at: u.created_at || new Date().toISOString(),
+    trade_count: u.trade_count || 0
+  }));
+
+  return (
+    <AdminClientPage 
+      totalUsers={totalUsers}
+      activeToday={activeToday}
+      totalTrades={totalTrades}
+      totalVolume={totalVolume}
+      initialUsers={initialUsers}
+    />
+  );
+}

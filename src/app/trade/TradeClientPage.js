@@ -186,6 +186,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
 
   // Search dialog visibility
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
 
   // Drawing toolbar states
   const [activeDrawingTool, setActiveDrawingTool] = useState('cursor'); // cursor, trend, fib, brush, text
@@ -611,168 +612,85 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
       : val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Lightweight-charts initialization
+  // Dynamic script loader for TradingView tv.js
   useEffect(() => {
-    let chart;
-    let mainSeries;
-    let volSeries;
+    if (window.TradingView) {
+      setScriptLoaded(true);
+      return;
+    }
+    const existingScript = document.getElementById('tradingview-widget-script');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => setScriptLoaded(true));
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'tradingview-widget-script';
+    script.src = 'https://s3.tradingview.com/tv.js';
+    script.type = 'text/javascript';
+    script.async = true;
+    script.onload = () => setScriptLoaded(true);
+    document.head.appendChild(script);
+  }, []);
 
-    const init = async () => {
-      const { createChart, CandlestickSeries, LineSeries, HistogramSeries } = await import('lightweight-charts');
-      if (!chartContainerRef.current) return;
+  // TradingView widget initialization
+  useEffect(() => {
+    if (!scriptLoaded || !window.TradingView || !chartContainerRef.current) return;
 
-      // TradingView Light Theme Config
-      chart = createChart(chartContainerRef.current, {
-        layout: {
-          background: { type: 'solid', color: '#ffffff' },
-          textColor: '#6b7280', // brand-muted
-        },
-        grid: {
-          vertLines: { color: '#f3f4f6' }, // extremely light gray lines
-          horzLines: { color: '#f3f4f6' },
-        },
-        crosshair: {
-          mode: 1, // magnet
-          vertLine: {
-            color: '#9ca3af',
-            width: 1,
-            style: 3, // dashed
-          },
-          horzLine: {
-            color: '#9ca3af',
-            width: 1,
-            style: 3, // dashed
-          },
-        },
-        rightPriceScale: {
-          borderColor: '#e5e7eb', // brand-border
-          scaleMargins: {
-            top: 0.15,
-            bottom: 0.25,
-          },
-        },
-        timeScale: {
-          borderColor: '#e5e7eb',
-          timeVisible: true,
-          secondsVisible: false,
-        },
-        width: chartContainerRef.current.clientWidth,
-        height: chartContainerRef.current.clientHeight || 300,
-      });
-
-      let chartData;
-      try {
-        const historyRes = await fetch(`/api/history?symbol=${encodeURIComponent(selectedAsset)}&timeframe=${timeframe}&count=80`);
-        if (historyRes.ok) {
-          chartData = await historyRes.json();
-        } else {
-          chartData = generateMockCandles(asset.price, timeframe, 80);
-        }
-      } catch (err) {
-        console.error('Failed to fetch real chart history:', err);
-        chartData = generateMockCandles(asset.price, timeframe, 80);
-      }
-
-      if (chartData && chartData.length > 0) {
-        lastBarRef.current = { ...chartData[chartData.length - 1] };
-      }
-
-      // Render chart based on selected type (Candlesticks vs Line)
-      if (chartType === 'candles') {
-        mainSeries = chart.addSeries(CandlestickSeries, {
-          upColor: '#089981', // TradingView Green
-          downColor: '#f23645', // TradingView Red
-          borderUpColor: '#089981',
-          borderDownColor: '#f23645',
-          wickUpColor: '#089981',
-          wickDownColor: '#f23645',
-        });
-        mainSeries.setData(chartData);
-      } else {
-        mainSeries = chart.addSeries(LineSeries, {
-          color: '#2563EB', // blue accent
-          lineWidth: 2,
-          priceLineVisible: true,
-          lastValueVisible: true,
-        });
-        const lineData = chartData.map(d => ({
-          time: d.time,
-          value: d.close
-        }));
-        mainSeries.setData(lineData);
-      }
-
-      volSeries = chart.addSeries(HistogramSeries, {
-        color: '#089981',
-        priceFormat: {
-          type: 'volume',
-        },
-        priceScaleId: '',
-      });
-
-      volSeries.priceScale().applyOptions({
-        scaleMargins: {
-          top: 0.8,
-          bottom: 0,
-        },
-      });
-
-      const volData = chartData.map(d => ({
-        time: d.time,
-        value: Math.floor(Math.random() * 150) + 20,
-        color: d.close >= d.open ? 'rgba(8, 153, 129, 0.12)' : 'rgba(242, 54, 69, 0.12)'
-      }));
-
-      volSeries.setData(volData);
-      chart.timeScale().fitContent();
-
-      chartRef.current = chart;
-      candleSeriesRef.current = mainSeries;
-      volSeriesRef.current = volSeries;
-
-      // Draw open position price lines on chart initial load
-      if (priceLinesRef.current.length > 0) {
-        priceLinesRef.current = [];
-      }
-      const activePositionsForAsset = positions.filter(
-        pos => pos.symbol === selectedAsset && pos.status !== 'closed'
-      );
-      activePositionsForAsset.forEach(pos => {
-        try {
-          const isBuy = pos.side?.toLowerCase() === 'buy';
-          const line = mainSeries.createPriceLine({
-            price: pos.entry,
-            color: isBuy ? '#089981' : '#f23645',
-            lineWidth: 1.5,
-            lineStyle: 2, // Dashed
-            axisLabelVisible: true,
-            title: `${pos.side?.toUpperCase()} ${pos.size?.toFixed(2)} Lots`,
-          });
-          priceLinesRef.current.push(line);
-        } catch (err) {
-          console.error('Failed to create price line on chart init:', err);
-        }
-      });
-
-      const resizeObserver = new ResizeObserver((entries) => {
-        if (entries.length === 0 || !chart) return;
-        const { width, height } = entries[0].contentRect;
-        chart.applyOptions({ width, height: height || 300 });
-      });
-      resizeObserver.observe(chartContainerRef.current);
-
-      return () => {
-        resizeObserver.disconnect();
-        chart.remove();
-      };
+    const tvSymbols = {
+      'BTC': 'BINANCE:BTCUSDT',
+      'ETH': 'BINANCE:ETHUSDT',
+      'EUR/USD': 'FX_IDC:EURUSD',
+      'GBP/USD': 'FX_IDC:GBPUSD',
+      'XAU/USD': 'OANDA:XAUUSD',
+      'AAPL': 'NASDAQ:AAPL'
     };
+    const tvSymbol = tvSymbols[selectedAsset] || `BINANCE:${selectedAsset}USDT`;
 
-    const cleanupPromise = init();
-
-    return () => {
-      cleanupPromise.then(cleanup => cleanup && cleanup());
+    const tvIntervals = {
+      '1m': '1',
+      '15m': '15',
+      '1H': '60',
+      '4H': '240',
+      '1D': 'D'
     };
-  }, [selectedAsset, timeframe, asset.price, chartType]);
+    const tvInterval = tvIntervals[timeframe] || '60';
+
+    const tvStyles = {
+      'candles': '1',
+      'line': '2'
+    };
+    const tvStyle = tvStyles[chartType] || '1';
+
+    // Clear previous containers to avoid duplicate instances
+    chartContainerRef.current.innerHTML = '';
+
+    const widgetId = 'tradingview_chart_widget';
+    const widgetDiv = document.createElement('div');
+    widgetDiv.id = widgetId;
+    widgetDiv.style.width = '100%';
+    widgetDiv.style.height = '100%';
+    chartContainerRef.current.appendChild(widgetDiv);
+
+    try {
+      new window.TradingView.widget({
+        autosize: true,
+        symbol: tvSymbol,
+        interval: tvInterval,
+        timezone: "Etc/UTC",
+        theme: "light",
+        style: tvStyle,
+        locale: "en",
+        enable_publishing: false,
+        hide_side_toolbar: false,
+        allow_symbol_change: true,
+        container_id: widgetId,
+        studies: [],
+        show_popup_button: false,
+      });
+    } catch (err) {
+      console.error('Failed to create TradingView widget:', err);
+    }
+  }, [scriptLoaded, selectedAsset, timeframe, chartType]);
 
   // Tick last candle in real time with live prices
   useEffect(() => {
@@ -1233,7 +1151,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
             </div>
 
             {/* lightweight-charts Canvas Wrapper */}
-            <div ref={chartContainerRef} className="flex-grow w-full bg-white relative" />
+            <div ref={chartContainerRef} className="flex-grow w-full h-full bg-white relative" />
           </div>
 
           {/* Positions / Terminal Section */}

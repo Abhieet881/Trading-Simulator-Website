@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     password_hash TEXT, -- Compatible with previous structure, can remain NULL
     plan_type TEXT DEFAULT 'free' NOT NULL,
     status TEXT DEFAULT 'active' NOT NULL,
+    is_admin BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -20,30 +21,38 @@ CREATE TABLE IF NOT EXISTS public.wallets (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Configure Row-Level Security (RLS)
--- To ensure the app can read/write during signup and dashboard views, we configure permissive policies.
--- In a strict production app, you can restrict SELECT/UPDATE to auth.uid() = user_id.
+-- 3. Helper function to check if the current user is an admin without recursion
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE id = auth.uid() AND is_admin = true
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 4. Configure Row-Level Security (RLS)
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
 
 -- Policies for public.users
 DROP POLICY IF EXISTS "Allow select for users" ON public.users;
 CREATE POLICY "Allow select for users" ON public.users 
-    FOR SELECT USING (true);
+    FOR SELECT USING (auth.uid() = id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Allow insert for users" ON public.users;
 CREATE POLICY "Allow insert for users" ON public.users 
-    FOR INSERT WITH CHECK (true);
+    FOR INSERT WITH CHECK (true); -- Anyone can sign up
 
 DROP POLICY IF EXISTS "Allow update for users" ON public.users;
 CREATE POLICY "Allow update for users" ON public.users 
-    FOR UPDATE USING (true);
+    FOR UPDATE USING (auth.uid() = id OR public.is_admin());
 
 -- Policies for public.wallets
 DROP POLICY IF EXISTS "Allow select for wallets" ON public.wallets;
 CREATE POLICY "Allow select for wallets" ON public.wallets 
-    FOR SELECT USING (true);
+    FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Allow insert for wallets" ON public.wallets;
 CREATE POLICY "Allow insert for wallets" ON public.wallets 
@@ -51,9 +60,9 @@ CREATE POLICY "Allow insert for wallets" ON public.wallets
 
 DROP POLICY IF EXISTS "Allow update for wallets" ON public.wallets;
 CREATE POLICY "Allow update for wallets" ON public.wallets 
-    FOR UPDATE USING (true);
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_admin());
 
--- 4. Create public.trades table
+-- 5. Create public.trades table
 CREATE TABLE IF NOT EXISTS public.trades (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
@@ -77,13 +86,12 @@ ALTER TABLE public.trades ENABLE ROW LEVEL SECURITY;
 -- Policies for public.trades
 DROP POLICY IF EXISTS "Allow select for trades" ON public.trades;
 CREATE POLICY "Allow select for trades" ON public.trades 
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Allow insert for trades" ON public.trades;
 CREATE POLICY "Allow insert for trades" ON public.trades 
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Allow update for trades" ON public.trades;
 CREATE POLICY "Allow update for trades" ON public.trades 
-    FOR UPDATE USING (auth.uid() = user_id);
-
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_admin());

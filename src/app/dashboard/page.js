@@ -11,6 +11,14 @@ import UserDropdown from './UserDropdown';
 export default async function DashboardPage() {
   const supabase = await createClient();
 
+  const formatPercent = (val) => {
+    if (val === 0) return '0.00%';
+    if (Math.abs(val) < 0.01) {
+      return `${val > 0 ? '+' : ''}${val.toFixed(4)}%`;
+    }
+    return `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
+  };
+
   // 1. Resolve authenticated user from Supabase Auth
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -158,75 +166,82 @@ export default async function DashboardPage() {
       {/* Main Dashboard Content */}
       <main className="max-w-6xl mx-auto px-6 py-10 flex-grow w-full">
         {/* Welcome Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-[#111111] tracking-tight">
-            Welcome back, {displayName}
-          </h1>
-          <p className="text-sm text-[#6B7280] mt-1.5 font-medium">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-3xl font-extrabold text-[#111111] tracking-tight">
+                Welcome back, {displayName}
+              </h1>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#16A34A] border border-[#C8E6C9] select-none">
+                🔥 5-day streak
+              </span>
+            </div>
+            <p className="text-sm text-[#6B7280] mt-1.5 font-medium">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Virtual Balance */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
+            <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Virtual Balance</span>
               <div className="p-2 bg-[#2563EB]/10 rounded-lg text-[#2563EB]">
                 <Wallet className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#111111]">
+            <p className="text-2xl font-bold text-[#111111] font-mono">
               ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
-            <span className="text-xs text-[#16A34A] font-medium flex items-center gap-1 mt-1">
+            <span className="text-xs text-[#16A34A] font-semibold flex items-center gap-1 mt-1">
               Ready to trade
             </span>
           </div>
 
           {/* Total P&L */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
+            <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Total P&L</span>
               <div className={`p-2 rounded-lg ${pnlIsPositive ? 'bg-[#16A34A]/10 text-[#16A34A]' : pnlIsNegative ? 'bg-[#DC2626]/10 text-[#DC2626]' : 'bg-gray-100 text-gray-400'}`}>
                 <TrendingUp className="w-5 h-5" />
               </div>
             </div>
-            <p className={`text-2xl font-bold ${pnlIsPositive ? 'text-[#16A34A]' : pnlIsNegative ? 'text-[#DC2626]' : 'text-gray-400'}`}>
+            <p className={`text-2xl font-bold font-mono ${pnlIsPositive ? 'text-[#16A34A]' : pnlIsNegative ? 'text-[#DC2626]' : 'text-gray-400'}`}>
               {pnlIsPositive ? '+' : ''}${totalClosedPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
-            <span className={`text-xs font-medium flex items-center gap-1 mt-1 ${pnlIsPositive ? 'text-[#16A34A]' : pnlIsNegative ? 'text-[#DC2626]' : 'text-gray-400'}`}>
-              {pnlIsPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
+            <span className={`text-xs font-semibold font-mono flex items-center gap-1 mt-1 ${pnlIsPositive ? 'text-[#16A34A]' : pnlIsNegative ? 'text-[#DC2626]' : 'text-gray-400'}`}>
+              {formatPercent(pnlPercent)}
             </span>
           </div>
 
           {/* Open Positions */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
+            <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Open Positions</span>
               <div className={`p-2 rounded-lg ${openPositionsCount > 0 ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'bg-gray-100 text-gray-400'}`}>
                 <BarChart3 className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#111111]">{openPositionsCount}</p>
-            <span className="text-xs text-gray-400 font-medium flex items-center gap-1 mt-1">
+            <p className="text-2xl font-bold text-[#111111] font-mono">{openPositionsCount}</p>
+            <span className="text-xs text-gray-400 font-semibold flex items-center gap-1 mt-1">
               {openPositionsCount > 0 ? `${openPositionsCount} active trades` : 'No active trades'}
             </span>
           </div>
 
           {/* Plan Type */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
+            <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Plan Type</span>
-              <div className="p-2 bg-[#EFF6FF] rounded-lg text-[#2563EB]">
+              <div className="p-2 bg-[#2563EB]/10 rounded-lg text-[#2563EB]">
                 <Award className="w-5 h-5" />
               </div>
             </div>
             <p className="text-2xl font-bold text-[#111111] capitalize">
               {planType} User
             </p>
-            <span className="text-xs text-[#2563EB] font-medium flex items-center gap-1 mt-1">
+            <span className="text-xs text-[#2563EB] font-semibold flex items-center gap-1 mt-1">
               Active
             </span>
           </div>
@@ -257,7 +272,7 @@ export default async function DashboardPage() {
           </div>
         ) : (
           /* Recent Activity Section */
-          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-12 max-w-4xl mx-auto">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-8 max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold text-[#111111] tracking-tight">Recent Activity</h2>
               <Link href="/trade" className="text-xs font-semibold text-[#2563EB] hover:underline">
@@ -271,8 +286,8 @@ export default async function DashboardPage() {
                     <th className="py-2.5 px-3">Date</th>
                     <th className="py-2.5 px-3">Symbol</th>
                     <th className="py-2.5 px-3">Side</th>
-                    <th className="py-2.5 px-3">Size (Lots)</th>
-                    <th className="py-2.5 px-3">Entry Price</th>
+                    <th className="py-2.5 px-3 text-right">Size (Lots)</th>
+                    <th className="py-2.5 px-3 text-right">Entry Price</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">P&L (USD)</th>
                   </tr>
@@ -285,19 +300,19 @@ export default async function DashboardPage() {
                     
                     return (
                       <tr key={t.id} className="hover:bg-gray-50/50">
-                        <td className="py-3 px-3 font-semibold text-gray-500">
+                        <td className="py-3 px-3 font-semibold text-gray-500 font-mono">
                           {new Date(t.created_at).toLocaleDateString()}
                         </td>
                         <td className="py-3 px-3 font-bold text-gray-900">{t.symbol}/USDT</td>
                         <td className="py-3 px-3">
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            t.side?.toLowerCase() === 'buy' ? 'bg-[#089981]/10 text-[#089981]' : 'bg-[#f23645]/10 text-[#f23645]'
+                            t.side?.toLowerCase() === 'buy' ? 'bg-[#16A34A]/10 text-[#16A34A]' : 'bg-[#DC2626]/10 text-[#DC2626]'
                           }`}>
                             {t.side?.charAt(0).toUpperCase() + t.side?.slice(1)}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-mono tabular-nums">{parseFloat(t.size).toFixed(2)}</td>
-                        <td className="py-3 px-3 font-mono tabular-nums">
+                        <td className="py-3 px-3 font-mono tabular-nums text-right">{parseFloat(t.size).toFixed(2)}</td>
+                        <td className="py-3 px-3 font-mono tabular-nums text-right">
                           ${parseFloat(t.entry_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="py-3 px-3">
@@ -308,7 +323,7 @@ export default async function DashboardPage() {
                           </span>
                         </td>
                         <td className={`py-3 px-3 text-right font-mono font-bold tabular-nums ${
-                          !isClosed ? 'text-gray-400' : isUp ? 'text-[#089981]' : 'text-[#f23645]'
+                          !isClosed ? 'text-gray-400' : isUp ? 'text-[#16A34A]' : 'text-[#DC2626]'
                         }`}>
                           {isClosed ? (isUp ? '+' : '') + tradePnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                         </td>
@@ -317,6 +332,16 @@ export default async function DashboardPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+            {/* View Full History link */}
+            <div className="mt-4 pt-4 border-t border-[#E5E7EB] flex justify-center select-none">
+              <Link 
+                href="/history" 
+                className="text-xs font-bold text-[#2563EB] hover:text-[#1d4ed8] flex items-center gap-1 group"
+              >
+                <span>View Full Trading History</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </div>
           </div>
         )}
@@ -390,7 +415,7 @@ export default async function DashboardPage() {
                 <Link 
                   key={asset.symbol} 
                   href={`/trade`}
-                  className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] hover:border-[#2563EB]/40 transition-all group cursor-pointer"
+                  className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 hover:border-[#2563EB]/40 transition-all group cursor-pointer flex flex-col justify-between h-full"
                 >
                   <div className="flex justify-between items-start">
                     <div>

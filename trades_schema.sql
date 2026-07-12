@@ -13,12 +13,14 @@ CREATE TABLE public.trades (
     entry_price NUMERIC(16, 8) NOT NULL,
     exit_price NUMERIC(16, 8),
     quantity NUMERIC(16, 8) NOT NULL,    -- lot / unit size
-    size NUMERIC(16, 8) NOT NULL,        -- backward compatibility
     usd_amount NUMERIC(16, 2) NOT NULL,   -- committed USD margin
     pnl NUMERIC(16, 2) DEFAULT 0.00,
     opened_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    closed_at TIMESTAMP WITH TIME ZONE
+    closed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Backward compatibility fields required by Next.js API routes (e.g. route.js inserts size/created_at)
+    size NUMERIC(16, 8) DEFAULT 0.00,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- 3. Enable Row-Level Security (RLS)
