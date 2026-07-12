@@ -52,3 +52,38 @@ CREATE POLICY "Allow insert for wallets" ON public.wallets
 DROP POLICY IF EXISTS "Allow update for wallets" ON public.wallets;
 CREATE POLICY "Allow update for wallets" ON public.wallets 
     FOR UPDATE USING (true);
+
+-- 4. Create public.trades table
+CREATE TABLE IF NOT EXISTS public.trades (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    symbol TEXT NOT NULL,          -- e.g. "BTC/USDT", "ETH/USDT"
+    side TEXT NOT NULL,            -- "buy" or "sell"
+    status TEXT DEFAULT 'open' NOT NULL, -- "open" or "closed"
+    entry_price NUMERIC(16, 8) NOT NULL,
+    exit_price NUMERIC(16, 8),
+    quantity NUMERIC(16, 8) NOT NULL,  -- lot/unit size
+    size NUMERIC(16, 8) NOT NULL,      -- backward compatibility
+    usd_amount NUMERIC(16, 2) NOT NULL,
+    pnl NUMERIC(16, 2),
+    opened_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    closed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Enable RLS for public.trades
+ALTER TABLE public.trades ENABLE ROW LEVEL SECURITY;
+
+-- Policies for public.trades
+DROP POLICY IF EXISTS "Allow select for trades" ON public.trades;
+CREATE POLICY "Allow select for trades" ON public.trades 
+    FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Allow insert for trades" ON public.trades;
+CREATE POLICY "Allow insert for trades" ON public.trades 
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Allow update for trades" ON public.trades;
+CREATE POLICY "Allow update for trades" ON public.trades 
+    FOR UPDATE USING (auth.uid() = user_id);
+

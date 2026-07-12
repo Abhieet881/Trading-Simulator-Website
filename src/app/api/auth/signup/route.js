@@ -31,6 +31,7 @@ export async function POST(req) {
     const emailLower = email.toLowerCase().trim();
 
     // 1. Sign up the user in Supabase Auth
+    console.log('Attempting Supabase Auth Sign Up. URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: emailLower,
       password: password,
@@ -42,6 +43,7 @@ export async function POST(req) {
     });
 
     if (authError) {
+      console.error('Supabase Auth SignUp error:', authError, 'Using URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
       return NextResponse.json({ success: false, error: authError.message }, { status: 400 });
     }
 

@@ -381,7 +381,7 @@ export default function Home() {
                       ${btcPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${btcPriceDirection === 'up' ? 'bg-[#0ECB81]/15 text-[#0ECB81]' : 'bg-[#F6465D]/15 text-[#F6465D]'}`}>
-                      {btcPriceDirection === 'up' ? '▲' : '▼'} +1.42%
+                      {btcPriceDirection === 'up' ? '▲ +1.42%' : '▼ -1.42%'}
                     </span>
                   </div>
                 </div>

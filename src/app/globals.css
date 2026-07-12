@@ -3,6 +3,7 @@
 @theme {
   /* Design System Theme Variables (MANDATORY Hex Codes) */
   --font-sans: var(--font-sans), Inter, sans-serif;
+  --font-mono: var(--font-mono), monospace;
   
   --color-brand-bg: #FFFFFF;
   --color-brand-bg-sec: #FAFAFA;
@@ -62,4 +63,19 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-brand-muted);
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
 }
