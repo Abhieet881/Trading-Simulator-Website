@@ -38,12 +38,13 @@ export default async function AdminPage() {
     redirect('/dashboard');
   }
 
-  // 3. Fetch admin metrics and user lists
+  // 3. Fetch admin metrics, user lists, and competitions
   let totalUsers = 0;
   let activeToday = 0;
   let totalTrades = 0;
   let totalVolume = 0.00;
   let usersList = [];
+  let competitionsList = [];
 
   try {
     // A. Fetch users
@@ -57,8 +58,15 @@ export default async function AdminPage() {
       .from('trades')
       .select('*');
 
+    // C. Fetch competitions
+    const { data: dbComps, error: compsErr } = await supabase
+      .from('competitions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
     if (usersErr) throw usersErr;
     if (tradesErr) throw tradesErr;
+    if (compsErr) throw compsErr;
 
     if (dbUsers) {
       totalUsers = dbUsers.length;
@@ -87,6 +95,10 @@ export default async function AdminPage() {
           .map(t => t.user_id)
       );
       activeToday = activeUsers.size;
+    }
+
+    if (dbComps) {
+      competitionsList = dbComps;
     }
   } catch (err) {
     console.warn('Supabase admin data query failed, falling back to local database:', err.message);
@@ -133,9 +145,12 @@ export default async function AdminPage() {
         );
         activeToday = activeUsers.size;
       }
+
+      competitionsList = db.competitions || [];
     }
   }
 
+  // Format users for UI
   const initialUsers = usersList.map(u => ({
     id: u.id,
     name: u.name || 'User',
@@ -146,6 +161,21 @@ export default async function AdminPage() {
     trade_count: u.trade_count || 0
   }));
 
+  // Aggregate signups data (daily signups counts)
+  const signupsByDate = {};
+  initialUsers.forEach(u => {
+    const dateStr = new Date(u.created_at).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric'
+    });
+    signupsByDate[dateStr] = (signupsByDate[dateStr] || 0) + 1;
+  });
+
+  // Convert to chart data format (take the latest 10 dates for readability, or all)
+  const signupsChartData = Object.entries(signupsByDate)
+    .map(([date, count]) => ({ date, count }))
+    .reverse(); // Match signup chronological order (usersList was sorted by newest first, so reverse it)
+
   return (
     <AdminClientPage 
       totalUsers={totalUsers}
@@ -153,6 +183,8 @@ export default async function AdminPage() {
       totalTrades={totalTrades}
       totalVolume={totalVolume}
       initialUsers={initialUsers}
+      initialCompetitions={competitionsList}
+      signupsChartData={signupsChartData}
     />
   );
 }
