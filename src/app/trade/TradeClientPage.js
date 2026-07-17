@@ -535,7 +535,9 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
           side: orderType, // 'buy' or 'sell'
           quantity: parseFloat(vol),
           entry_price: entryPrice,
-          usd_amount: marginRequired
+          usd_amount: marginRequired,
+          take_profit: tpPrice ? parseFloat(tpPrice) : null,
+          stop_loss: slPrice ? parseFloat(slPrice) : null
         })
       });
 
@@ -563,7 +565,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   };
 
   // Close open position
-  const handleClosePosition = async (tradeId, symbol, entryPrice) => {
+  const handleClosePosition = async (tradeId, symbol, entryPrice, autoCloseReason = null) => {
     const exitPrice = prices[symbol] || entryPrice;
     try {
       const response = await fetch('/api/trades', {
@@ -581,7 +583,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
         return;
       }
 
-      showToast('Position closed successfully', 'success');
+      showToast(autoCloseReason || 'Position closed successfully', 'success');
       setBalance(data.newBalance);
       refreshOpenTrades();
       
@@ -594,6 +596,61 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
       showToast('Failed to close position.', 'info');
     }
   };
+
+  const closingTradesRef = useRef(new Set());
+
+  // Clean up closingTradesRef if positions change
+  useEffect(() => {
+    if (positions) {
+      const openIds = new Set(positions.map(p => p.id));
+      closingTradesRef.current.forEach(id => {
+        if (!openIds.has(id)) {
+          closingTradesRef.current.delete(id);
+        }
+      });
+    }
+  }, [positions]);
+
+  // Client-side TP/SL Auto-Execution Check
+  useEffect(() => {
+    // NOTE: Client-side check running on each price tick. A proper production version would need a server-side cron/trigger for this.
+    if (!positions || positions.length === 0) return;
+
+    positions.forEach(pos => {
+      const currentPrice = prices[pos.symbol];
+      if (!currentPrice) return;
+
+      const tp = pos.take_profit ? parseFloat(pos.take_profit) : null;
+      const sl = pos.stop_loss ? parseFloat(pos.stop_loss) : null;
+
+      let shouldClose = false;
+      let reason = '';
+
+      if (pos.side?.toLowerCase() === 'buy') {
+        if (tp && currentPrice >= tp) {
+          shouldClose = true;
+          reason = `Position auto-closed: Take Profit hit`;
+        } else if (sl && currentPrice <= sl) {
+          shouldClose = true;
+          reason = `Position auto-closed: Stop Loss hit`;
+        }
+      } else if (pos.side?.toLowerCase() === 'sell') {
+        if (tp && currentPrice <= tp) {
+          shouldClose = true;
+          reason = `Position auto-closed: Take Profit hit`;
+        } else if (sl && currentPrice >= sl) {
+          shouldClose = true;
+          reason = `Position auto-closed: Stop Loss hit`;
+        }
+      }
+
+      if (shouldClose) {
+        if (closingTradesRef.current.has(pos.id)) return;
+        closingTradesRef.current.add(pos.id);
+        handleClosePosition(pos.id, pos.symbol, pos.entry, reason);
+      }
+    });
+  }, [prices, positions]);
 
 
   const handleAssetChange = (sym) => {
@@ -881,6 +938,12 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
               className="text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-colors uppercase tracking-wider"
             >
               Leaderboard
+            </Link>
+            <Link 
+              href="/competitions" 
+              className="text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-colors uppercase tracking-wider"
+            >
+              Competitions
             </Link>
           </nav>
 
@@ -1188,6 +1251,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                         <th className="px-3 py-1.5">Side</th>
                         <th className="px-3 py-1.5">Vol (Lots)</th>
                         <th className="px-3 py-1.5">Entry Price</th>
+                        <th className="px-3 py-1.5">TP/SL</th>
                         <th className="px-3 py-1.5">Current Price</th>
                         <th className="px-3 py-1.5 text-right">P&L (USD)</th>
                         <th className="px-3 py-1.5 text-right">Actions</th>
@@ -1212,6 +1276,13 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                             <td className="px-3 py-1.5 font-mono tabular-nums">{pos.size.toFixed(2)}</td>
                             <td className="px-3 py-1.5 font-mono tabular-nums">
                               {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.entry.toFixed(4) : `$${pos.entry.toLocaleString()}`}
+                            </td>
+                            <td className="px-3 py-1.5 font-mono tabular-nums text-gray-500">
+                              {(() => {
+                                const tpText = pos.take_profit ? (['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.take_profit.toFixed(4) : pos.take_profit.toLocaleString()) : '--';
+                                const slText = pos.stop_loss ? (['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.stop_loss.toFixed(4) : pos.stop_loss.toLocaleString()) : '--';
+                                return `${tpText} / ${slText}`;
+                              })()}
                             </td>
                             <td className="px-3 py-1.5 font-mono tabular-nums text-gray-900">
                               {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? currentVal.toFixed(4) : `$${currentVal.toLocaleString()}`}

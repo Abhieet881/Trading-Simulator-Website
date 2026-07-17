@@ -131,6 +131,9 @@ export default function HistoryClientPage({ userName, trades = [] }) {
             <Link href="/leaderboard" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
               Leaderboard
             </Link>
+            <Link href="/competitions" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
+              Competitions
+            </Link>
           </nav>
 
           {/* User Profile dropdown */}

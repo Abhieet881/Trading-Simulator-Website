@@ -23,6 +23,20 @@ export default function AdminClientPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingUser, setLoadingUser] = useState(null);
+
+  // User Editing State
+  const [editingUser, setEditingUser] = useState(null);
+  const [userFormData, setUserFormData] = useState({ name: '', plan_type: 'free', virtual_balance: '10000' });
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [userFormError, setUserFormError] = useState('');
+  const [userFormLoading, setUserFormLoading] = useState(false);
+
+  // User Deletion State
+  const [deletingUser, setDeletingUser] = useState(null);
+  const [confirmEmailInput, setConfirmEmailInput] = useState('');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteFormError, setDeleteFormError] = useState('');
+  const [deleteFormLoading, setDeleteFormLoading] = useState(false);
   
   // Mounted state to handle SSR with Recharts cleanly
   const [mounted, setMounted] = useState(false);
@@ -129,6 +143,100 @@ export default function AdminClientPage({
     }
   };
 
+  // Open Edit User Modal
+  const openEditUserModal = (user) => {
+    setEditingUser(user);
+    setUserFormData({
+      name: user.name || '',
+      plan_type: user.plan_type || 'free',
+      virtual_balance: user.virtual_balance !== undefined ? user.virtual_balance.toString() : '10000'
+    });
+    setUserFormError('');
+    setIsUserModalOpen(true);
+  };
+
+  // Submit Edit User
+  const handleEditUserSubmit = async (e) => {
+    e.preventDefault();
+    setUserFormLoading(true);
+    setUserFormError('');
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: editingUser.id,
+          name: userFormData.name,
+          plan_type: userFormData.plan_type,
+          virtual_balance: parseFloat(userFormData.virtual_balance)
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUsers(prev => prev.map(u => {
+          if (u.id === editingUser.id) {
+            return {
+              ...u,
+              name: userFormData.name,
+              plan_type: userFormData.plan_type,
+              virtual_balance: parseFloat(userFormData.virtual_balance)
+            };
+          }
+          return u;
+        }));
+        setIsUserModalOpen(false);
+      } else {
+        setUserFormError(data.error || 'Failed to update user');
+      }
+    } catch (err) {
+      console.error('Failed to edit user:', err);
+      setUserFormError('Failed to save user changes.');
+    } finally {
+      setUserFormLoading(false);
+    }
+  };
+
+  // Open Delete User Modal
+  const openDeleteUserModal = (user) => {
+    setDeletingUser(user);
+    setConfirmEmailInput('');
+    setDeleteFormError('');
+    setIsDeleteModalOpen(true);
+  };
+
+  // Submit Delete User
+  const handleDeleteUserSubmit = async (e) => {
+    e.preventDefault();
+    if (confirmEmailInput.toLowerCase().trim() !== deletingUser.email.toLowerCase().trim()) {
+      setDeleteFormError('Email does not match.');
+      return;
+    }
+
+    setDeleteFormLoading(true);
+    setDeleteFormError('');
+
+    try {
+      const res = await fetch(`/api/admin/users?userId=${deletingUser.id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUsers(prev => prev.filter(u => u.id !== deletingUser.id));
+        setIsDeleteModalOpen(false);
+      } else {
+        setDeleteFormError(data.error || 'Failed to delete user.');
+      }
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      setDeleteFormError('An error occurred during deletion.');
+    } finally {
+      setDeleteFormLoading(false);
+    }
+  };
+
   // Open modal for Creating Competition
   const openCreateModal = () => {
     setEditingComp(null);
@@ -225,8 +333,8 @@ export default function AdminClientPage({
   };
 
   // Delete Competition Handler
-  const deleteCompetition = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this competition? This cannot be undone.')) return;
+  const deleteCompetition = async (id, title) => {
+    if (!window.confirm(`Delete '${title}'? This will also remove all participant records for this competition. This cannot be undone.`)) return;
 
     try {
       const res = await fetch(`/api/admin/competitions?id=${id}`, {
@@ -423,35 +531,57 @@ export default function AdminClientPage({
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-400 font-mono">
-                          {new Date(u.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </td>
                         <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
                           {u.trade_count}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() => toggleStatus(u.id, u.status)}
-                            disabled={loadingUser === u.id}
-                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer ${
-                              isSuspended
-                                ? 'bg-green-600 hover:bg-green-700 text-white'
-                                : 'bg-[#EF4444]/20 hover:bg-[#EF4444]/30 text-[#F87171] border border-[#EF4444]/30'
-                            }`}
-                          >
-                            {loadingUser === u.id ? (
-                              <span>Updating...</span>
-                            ) : isSuspended ? (
-                              <>
-                                <UserCheck className="w-3.5 h-3.5" />
-                                Activate
-                              </>
-                            ) : (
-                              <>
-                                <UserX className="w-3.5 h-3.5" />
-                                Suspend
-                              </>
-                            )}
-                          </button>
+                          <div className="flex justify-center items-center gap-2">
+                            {/* Edit Button */}
+                            <button
+                              onClick={() => openEditUserModal(u)}
+                              className="p-1.5 bg-[#1F2937]/50 hover:bg-[#374151]/50 text-slate-400 hover:text-white rounded border border-[#374151]/30 cursor-pointer transition-colors"
+                              title="Edit User"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Suspend/Activate Button */}
+                            <button
+                              onClick={() => toggleStatus(u.id, u.status)}
+                              disabled={loadingUser === u.id}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer ${
+                                isSuspended
+                                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                                  : 'bg-[#EF4444]/20 hover:bg-[#EF4444]/30 text-[#F87171] border border-[#EF4444]/30'
+                              }`}
+                              title={isSuspended ? "Activate User" : "Suspend User"}
+                            >
+                              {loadingUser === u.id ? (
+                                <span>...</span>
+                              ) : isSuspended ? (
+                                <>
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  Active
+                                </>
+                              ) : (
+                                <>
+                                  <UserX className="w-3.5 h-3.5" />
+                                  Suspend
+                                </>
+                              )}
+                            </button>
+
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => openDeleteUserModal(u)}
+                              className="p-1.5 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 text-[#EF4444] rounded border border-[#EF4444]/20 cursor-pointer transition-colors"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -630,10 +760,10 @@ export default function AdminClientPage({
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-400 font-mono">
-                          {new Date(c.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(c.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="py-3.5 px-4 text-slate-400 font-mono">
-                          {new Date(c.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(c.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="py-3.5 px-4 text-center font-mono text-white">
                           {entry === 0 ? 'Free' : `$${entry.toFixed(2)}`}
@@ -804,6 +934,164 @@ export default function AdminClientPage({
                   className="px-5 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer select-none"
                 >
                   {formLoading ? 'Submitting...' : editingComp ? 'Save Changes' : 'Create Competition'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- USER EDIT MODAL ---------------- */}
+      {isUserModalOpen && editingUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#0E1322] border border-[#1F2937] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#1F2937] flex items-center justify-between">
+              <h3 className="font-bold text-white text-base flex items-center gap-1.5">
+                <Edit className="w-5 h-5 text-[#2563EB]" />
+                Edit User: {editingUser.email}
+              </h3>
+              <button 
+                onClick={() => setIsUserModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body Form */}
+            <form onSubmit={handleEditUserSubmit} className="p-6 space-y-4 text-sm">
+              {userFormError && (
+                <div className="p-3 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg text-[#F87171] text-xs font-semibold">
+                  {userFormError}
+                </div>
+              )}
+
+              {/* Name Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 block">Name</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. John Doe"
+                  value={userFormData.name}
+                  onChange={(e) => setUserFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-[#172033] border border-[#27354F] rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors"
+                />
+              </div>
+
+              {/* Plan Type Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 block">Plan Type</label>
+                <select
+                  value={userFormData.plan_type}
+                  onChange={(e) => setUserFormData(prev => ({ ...prev, plan_type: e.target.value }))}
+                  className="w-full bg-[#172033] border border-[#27354F] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors font-semibold"
+                >
+                  <option value="free">Free</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </div>
+
+              {/* Virtual Balance Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 block">Virtual Balance (USD)</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-mono">$</span>
+                  <input 
+                    type="number" 
+                    required
+                    step="any"
+                    placeholder="10000.00"
+                    value={userFormData.virtual_balance}
+                    onChange={(e) => setUserFormData(prev => ({ ...prev, virtual_balance: e.target.value }))}
+                    className="w-full bg-[#172033] border border-[#27354F] rounded-lg pl-7 pr-3 py-2 text-white focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors font-mono font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#1F2937] mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsUserModalOpen(false)}
+                  className="px-4 py-2 bg-transparent hover:bg-slate-800 text-slate-300 font-semibold text-xs rounded-lg transition-colors cursor-pointer select-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={userFormLoading}
+                  className="px-5 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer select-none"
+                >
+                  {userFormLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- USER DELETE MODAL ---------------- */}
+      {isDeleteModalOpen && deletingUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#0E1322] border border-[#1F2937] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#1F2937] flex items-center justify-between">
+              <h3 className="font-bold text-white text-base flex items-center gap-1.5">
+                <Trash2 className="w-5 h-5 text-[#EF4444]" />
+                Delete User Account
+              </h3>
+              <button 
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body Form */}
+            <form onSubmit={handleDeleteUserSubmit} className="p-6 space-y-4 text-sm">
+              <div className="p-3 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg text-[#F87171] text-xs font-semibold">
+                This will permanently delete <strong>{deletingUser.name || 'User'}</strong>'s account, all their trades, and wallet data. This cannot be undone.
+              </div>
+
+              {deleteFormError && (
+                <div className="p-3 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg text-[#F87171] text-xs font-semibold">
+                  {deleteFormError}
+                </div>
+              )}
+
+              {/* Confirmation Email Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 block">
+                  Type the user's email <strong className="text-white font-mono">{deletingUser.email}</strong> to confirm:
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Enter email to confirm"
+                  value={confirmEmailInput}
+                  onChange={(e) => setConfirmEmailInput(e.target.value)}
+                  className="w-full bg-[#172033] border border-[#27354F] rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444] transition-colors font-semibold"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#1F2937] mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="px-4 py-2 bg-transparent hover:bg-slate-800 text-slate-300 font-semibold text-xs rounded-lg transition-colors cursor-pointer select-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleteFormLoading || confirmEmailInput.toLowerCase().trim() !== deletingUser.email.toLowerCase().trim()}
+                  className="px-5 py-2 bg-[#EF4444] hover:bg-[#DC2626] disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer select-none"
+                >
+                  {deleteFormLoading ? 'Deleting...' : 'Permanently Delete User'}
                 </button>
               </div>
             </form>

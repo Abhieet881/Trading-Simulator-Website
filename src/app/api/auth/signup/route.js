@@ -30,12 +30,16 @@ export async function POST(req) {
     const supabase = await createClient();
     const emailLower = email.toLowerCase().trim();
 
+    const requestUrl = new URL(req.url);
+    const origin = requestUrl.origin;
+
     // 1. Sign up the user in Supabase Auth
     console.log('Attempting Supabase Auth Sign Up. URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: emailLower,
       password: password,
       options: {
+        emailRedirectTo: `${origin}/auth/callback`,
         data: {
           name: name.trim(),
         }
@@ -73,8 +77,10 @@ export async function POST(req) {
       .from('wallets')
       .insert({
         user_id: authUser.id,
-        virtual_balance: 10000.00,
-        currency: 'USD'
+        virtual_balance: 0.00,
+        currency: 'USD',
+        initial_balance: 0.00,
+        balance_configured: false
       });
 
     if (walletError) {
@@ -82,9 +88,11 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: walletError.message }, { status: 400 });
     }
 
+    const session = authData.session;
     return NextResponse.json({ 
       success: true, 
-      redirect: '/dashboard',
+      needsVerification: !session,
+      redirect: session ? '/dashboard' : null,
       user: { id: authUser.id, name: name.trim(), email: emailLower }
     });
   } catch (error) {

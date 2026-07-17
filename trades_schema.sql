@@ -20,7 +20,9 @@ CREATE TABLE public.trades (
     
     -- Backward compatibility fields required by Next.js API routes (e.g. route.js inserts size/created_at)
     size NUMERIC(16, 8) DEFAULT 0.00,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    take_profit NUMERIC(16, 8),
+    stop_loss NUMERIC(16, 8)
 );
 
 -- 3. Enable Row-Level Security (RLS)

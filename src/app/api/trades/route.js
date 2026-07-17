@@ -31,7 +31,7 @@ function writeLocalDb(db) {
 }
 
 // Local helper to place trade order
-function handleLocalPost(userId, { symbol, side, quantity, entry_price, usd_amount }) {
+function handleLocalPost(userId, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss }) {
   const db = readLocalDb();
   const balance = db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00;
   const numUsdAmount = parseFloat(usd_amount);
@@ -57,7 +57,9 @@ function handleLocalPost(userId, { symbol, side, quantity, entry_price, usd_amou
     pnl: 0.00,
     opened_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
-    closed_at: null
+    closed_at: null,
+    take_profit: take_profit ? parseFloat(take_profit) : null,
+    stop_loss: stop_loss ? parseFloat(stop_loss) : null
   };
 
   db.trades.push(newTrade);
@@ -172,7 +174,9 @@ export async function GET(request) {
       pnl: t.pnl ? parseFloat(t.pnl) : 0,
       time: new Date(t.opened_at || t.created_at).toLocaleString(),
       closed_time: t.closed_at ? new Date(t.closed_at).toLocaleString() : null,
-      status: t.status
+      status: t.status,
+      take_profit: t.take_profit ? parseFloat(t.take_profit) : null,
+      stop_loss: t.stop_loss ? parseFloat(t.stop_loss) : null
     }));
 
     return NextResponse.json(formattedTrades);
@@ -205,7 +209,9 @@ export async function GET(request) {
       pnl: t.pnl ? parseFloat(t.pnl) : 0,
       time: new Date(t.opened_at).toLocaleString(),
       closed_time: t.closed_at ? new Date(t.closed_at).toLocaleString() : null,
-      status: t.status
+      status: t.status,
+      take_profit: t.take_profit ? parseFloat(t.take_profit) : null,
+      stop_loss: t.stop_loss ? parseFloat(t.stop_loss) : null
     }));
 
     return NextResponse.json(formattedTrades);
@@ -229,7 +235,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { symbol, side, quantity, entry_price, usd_amount } = bodyData;
+  const { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss } = bodyData;
 
   // Basic validation
   if (!symbol || !side || !quantity || !entry_price || !usd_amount) {
@@ -254,7 +260,7 @@ export async function POST(request) {
 
     if (walletError) {
       if (walletError.message?.includes('schema cache') || walletError.message?.includes('does not exist')) {
-        return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount });
+        return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
       }
       throw walletError;
     }
@@ -287,7 +293,9 @@ export async function POST(request) {
         quantity: numQuantity,
         size: numQuantity, // compatibility
         usd_amount: numUsdAmount,
-        pnl: 0.00
+        pnl: 0.00,
+        take_profit: take_profit ? parseFloat(take_profit) : null,
+        stop_loss: stop_loss ? parseFloat(stop_loss) : null
       })
       .select()
       .single();
@@ -295,12 +303,12 @@ export async function POST(request) {
     if (insertError) {
       // Rollback wallet balance update if trade insert fails
       await supabase
-        .from('wallets')
-        .update({ virtual_balance: balance, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+         .from('wallets')
+         .update({ virtual_balance: balance, updated_at: new Date().toISOString() })
+         .eq('user_id', user.id);
       
       if (insertError.message?.includes('schema cache') || insertError.message?.includes('does not exist')) {
-        return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount });
+        return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
       }
       throw insertError;
     }
@@ -312,7 +320,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.warn('[Supabase cache fallback] Executing trade locally:', error.message);
-    return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount });
+    return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
   }
 }
 

@@ -15,7 +15,8 @@ export default function SettingsClientPage({
   initialEmail,
   initialCreatedAt,
   initialPlanType,
-  initialBalance
+  initialBalance,
+  initialConfiguredBalance = 10000.00
 }) {
   const [name, setName] = useState(initialName);
   const [balance, setBalance] = useState(initialBalance);
@@ -95,7 +96,7 @@ export default function SettingsClientPage({
       const data = await res.json();
       if (res.ok) {
         setBalance(data.newBalance);
-        showToast('Virtual balance reset to $10,000.00', 'success');
+        showToast(`Virtual balance reset to $${data.newBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'success');
       } else {
         showToast(data.error || 'Failed to reset balance.', 'info');
       }
@@ -147,6 +148,9 @@ export default function SettingsClientPage({
             </Link>
             <Link href="/leaderboard" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
               Leaderboard
+            </Link>
+            <Link href="/competitions" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
+              Competitions
             </Link>
           </nav>
 
@@ -316,7 +320,7 @@ export default function SettingsClientPage({
                 <div className="space-y-0.5">
                   <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">Reset Virtual Balance</span>
                   <p className="text-[10px] text-gray-400 font-semibold">
-                    Set your account back to $10,000.00 and close all open positions.
+                    Set your account back to ${initialConfiguredBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} and close all open positions.
                   </p>
                 </div>
                 <button
@@ -370,7 +374,7 @@ export default function SettingsClientPage({
             </div>
             <h3 className="text-base font-bold text-gray-900 mb-2">Reset Account?</h3>
             <p className="text-xs text-gray-500 font-medium leading-relaxed mb-6">
-              This will reset your balance to $10,000 and close all open positions. This cannot be undone. Are you sure?
+              This will reset your balance to ${initialConfiguredBalance.toLocaleString('en-US')} and close all open positions. This cannot be undone. Are you sure?
             </p>
             <div className="flex gap-3 justify-end">
               <button

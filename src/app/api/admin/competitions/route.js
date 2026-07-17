@@ -226,6 +226,9 @@ export async function DELETE(request) {
         const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
         if (db.competitions) {
           db.competitions = db.competitions.filter(c => c.id !== id);
+          if (db.competition_participants) {
+            db.competition_participants = db.competition_participants.filter(p => p.competition_id !== id);
+          }
           fs.writeFileSync(localDbPath, JSON.stringify(db, null, 2));
         }
       }

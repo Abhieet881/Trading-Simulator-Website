@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import UserDropdown from './UserDropdown';
+import OnboardingBalanceSelector from './OnboardingBalanceSelector';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -39,31 +40,50 @@ export default async function DashboardPage() {
   const planType = dbUser?.plan_type || 'free';
 
   // 3. Resolve wallet balance from public.wallets table
-  let balance = 10000.00;
+  let balance = 0.00;
+  let balanceConfigured = false;
+  let initialBalance = 0.00;
   try {
     const { data: dbWallet, error: dbWalletError } = await supabase
       .from('wallets')
-      .select('virtual_balance')
+      .select('virtual_balance, balance_configured, initial_balance')
       .eq('user_id', user.id)
       .single();
 
     if (dbWalletError) {
-      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist')) {
+      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
         const fs = require('fs');
         const path = require('path');
         const localDbPath = path.join(process.cwd(), 'local_db.json');
         if (fs.existsSync(localDbPath)) {
           const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 10000.00;
+          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+          balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
+          initialBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 0.00;
         }
       } else {
         throw dbWalletError;
       }
     } else if (dbWallet) {
-      balance = parseFloat(dbWallet.virtual_balance);
+      balance = parseFloat(dbWallet.virtual_balance || 0);
+      balanceConfigured = dbWallet.balance_configured || false;
+      initialBalance = parseFloat(dbWallet.initial_balance || 0);
     }
   } catch (err) {
     console.error('Failed to fetch wallet for dashboard, using fallback:', err);
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
+        initialBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 0.00;
+      } catch (e) {
+        console.error(e);
+      }
+    }
   }
 
   // 4. Fetch trades from public.trades table
@@ -153,6 +173,12 @@ export default async function DashboardPage() {
               className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors"
             >
               Leaderboard
+            </Link>
+            <Link 
+              href="/competitions" 
+              className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors"
+            >
+              Competitions
             </Link>
           </nav>
 
@@ -247,8 +273,10 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Conditional Body: Empty State or Activity List */}
-        {!hasTrades ? (
+        {/* Conditional Body: Onboarding Balance Selector, Empty State, or Activity List */}
+        {!balanceConfigured ? (
+          <OnboardingBalanceSelector />
+        ) : !hasTrades ? (
           /* Empty State Section */
           <div className="bg-white border border-[#E5E7EB] rounded-2xl p-10 md:p-16 text-center max-w-2xl mx-auto shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-12">
             <div className="w-16 h-16 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-6 text-[#2563EB]">

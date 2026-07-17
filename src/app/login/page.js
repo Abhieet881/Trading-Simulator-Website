@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { TrendingUp, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { TrendingUp, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,10 +15,30 @@ export default function LoginPage() {
   // UI states
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   
   // Error states
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
+
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Extract query parameters
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      const msg = params.get('message');
+      if (err) {
+        setApiError(err);
+      }
+      if (msg) {
+        setSuccessMessage(msg);
+      }
+    }
+  }, []);
 
   // Client-side validation
   const validate = () => {
@@ -44,6 +64,8 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError('');
+    setResendEmail('');
+    setResendSuccess(false);
     
     if (!validate()) return;
     
@@ -61,6 +83,9 @@ export default function LoginPage() {
       if (res.ok && data.success) {
         router.push('/dashboard');
         router.refresh();
+      } else if (data.error === 'Email not confirmed') {
+        setApiError('Please verify your email before logging in. Check your inbox.');
+        setResendEmail(data.email || email);
       } else {
         setApiError(data.error || 'Invalid email or password.');
       }
@@ -71,10 +96,29 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = (e) => {
-    e.preventDefault();
-    alert("Password reset functionality is under development. Please check back later!");
+  const handleResendVerification = async () => {
+    if (!resendEmail) return;
+    setResendLoading(true);
+    setApiError('');
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendSuccess(true);
+      } else {
+        setApiError(data.error || 'Failed to resend verification email.');
+      }
+    } catch (err) {
+      setApiError('A network error occurred. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8">
@@ -95,11 +139,36 @@ export default function LoginPage() {
           <p className="text-sm text-[#6B7280] mt-1">Log in to manage your paper trading portfolio</p>
         </div>
 
+        {/* Success Banner */}
+        {successMessage && (
+          <div className="mb-5 flex items-start gap-2.5 text-sm font-semibold text-[#16A34A] bg-[#16A34A]/10 px-4 py-3 rounded-lg border border-[#16A34A]/20 animate-fade-in">
+            <CheckCircle className="w-5 h-5 flex-shrink-0 text-[#16A34A]" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
         {/* API Level Error Banner */}
         {apiError && (
-          <div className="mb-5 flex items-start gap-2.5 text-sm font-semibold text-[#DC2626] bg-[#DC2626]/10 px-4 py-3 rounded-lg border border-[#DC2626]/20 animate-fade-in">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-[#DC2626]" />
-            <span>{apiError}</span>
+          <div className="mb-5 flex flex-col gap-2 text-sm font-semibold text-[#DC2626] bg-[#DC2626]/10 px-4 py-3 rounded-lg border border-[#DC2626]/20 animate-fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 text-[#DC2626]" />
+              <span>{apiError}</span>
+            </div>
+            {resendEmail && !resendSuccess && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+                className="text-left text-xs font-bold text-[#2563EB] hover:underline mt-1.5 ml-7 disabled:opacity-50 cursor-pointer"
+              >
+                {resendLoading ? 'Resending...' : 'Resend verification email'}
+              </button>
+            )}
+            {resendSuccess && (
+              <div className="text-xs font-medium text-[#16A34A] mt-1.5 ml-7">
+                Verification email resent! Check your inbox.
+              </div>
+            )}
           </div>
         )}
 
@@ -129,13 +198,12 @@ export default function LoginPage() {
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
               <label className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Password</label>
-              <a
-                href="#"
-                onClick={handleForgotPassword}
+              <Link
+                href="/forgot-password"
                 className="text-xs font-semibold text-[#2563EB] hover:underline"
               >
                 Forgot Password?
-              </a>
+              </Link>
             </div>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-[#6B7280]" />

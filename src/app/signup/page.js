@@ -19,6 +19,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   
   // Error states
   const [errors, setErrors] = useState({});
@@ -77,8 +78,12 @@ export default function SignupPage() {
       const data = await res.json();
       
       if (res.ok && data.success) {
-        router.push('/dashboard');
-        router.refresh();
+        if (data.needsVerification) {
+          setRegisteredEmail(email);
+        } else {
+          router.push('/dashboard');
+          router.refresh();
+        }
       } else {
         setApiError(data.error || 'Something went wrong. Please try again.');
       }
@@ -88,6 +93,70 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  if (registeredEmail) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8">
+        {/* Top Logo */}
+        <div className="flex justify-center mb-6">
+          <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+            <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <TrendingUp className="text-white w-4.5 h-4.5" />
+            </div>
+            <span className="font-bold text-lg tracking-tight text-[#111111]">PaperPulse</span>
+          </Link>
+        </div>
+
+        {/* Main card */}
+        <div className="sm:mx-auto sm:w-full sm:max-w-[420px] bg-white rounded-2xl border border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.02)] p-8 text-center flex flex-col items-center">
+          <div className="w-16 h-16 rounded-full bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB] mb-6">
+            <Mail className="w-8 h-8" />
+          </div>
+          
+          <h2 className="text-2xl font-bold tracking-tight text-[#111111] mb-3">Check your email</h2>
+          <p className="text-sm text-[#6B7280] leading-relaxed mb-6">
+            We've sent a verification link to <strong className="text-[#111111] font-semibold">{registeredEmail}</strong>. Please verify your email to activate your account.
+          </p>
+
+          <div className="w-full flex flex-col gap-3">
+            <Link 
+              href="/login" 
+              className="w-full py-3 bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all text-sm flex items-center justify-center gap-2"
+            >
+              Go to Log In
+            </Link>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/auth/resend-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: registeredEmail }),
+                  });
+                  const d = await res.json();
+                  if (res.ok && d.success) {
+                    alert('Verification email resent successfully!');
+                  } else {
+                    alert(d.error || 'Failed to resend verification email.');
+                  }
+                } catch (e) {
+                  alert('A network error occurred. Please try again.');
+                }
+              }}
+              className="text-xs font-semibold text-[#2563EB] hover:underline py-2"
+            >
+              Didn't receive the email? Resend link
+            </button>
+          </div>
+        </div>
+
+        {/* Footer copyright */}
+        <div className="text-center text-xs text-[#9CA3AF] mt-8">
+          &copy; {new Date().getFullYear()} PaperPulse. All rights reserved.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8">

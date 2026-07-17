@@ -28,31 +28,49 @@ export default async function TradePage() {
   const displayName = dbUser?.name || user.user_metadata?.name || 'Trader';
 
   // 3. Fetch user wallet balance
-  let balance = 10000.00;
+  let balance = 0.00;
+  let balanceConfigured = false;
   try {
     const { data: dbWallet, error: dbWalletError } = await supabase
       .from('wallets')
-      .select('virtual_balance')
+      .select('virtual_balance, balance_configured')
       .eq('user_id', user.id)
       .single();
 
     if (dbWalletError) {
-      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist')) {
+      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
         const fs = require('fs');
         const path = require('path');
         const localDbPath = path.join(process.cwd(), 'local_db.json');
         if (fs.existsSync(localDbPath)) {
           const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 10000.00;
+          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+          balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
         }
       } else {
         throw dbWalletError;
       }
     } else if (dbWallet) {
-      balance = parseFloat(dbWallet.virtual_balance);
+      balance = parseFloat(dbWallet.virtual_balance || 0);
+      balanceConfigured = dbWallet.balance_configured || false;
     }
   } catch (err) {
     console.error('Failed to fetch wallet from Supabase, using default:', err);
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
+      } catch (e) {}
+    }
+  }
+
+  // Redirect to dashboard if starting balance is not set
+  if (!balanceConfigured) {
+    redirect('/dashboard');
   }
 
   // 4. Fetch user's active positions from Supabase
@@ -79,7 +97,9 @@ export default async function TradePage() {
             entry: parseFloat(pos.entry_price),
             size: parseFloat(pos.quantity),
             swap: 0.00,
-            time: new Date(pos.opened_at).toLocaleString()
+            time: new Date(pos.opened_at).toLocaleString(),
+            take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
+            stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
           }));
         }
       } else {
@@ -93,7 +113,9 @@ export default async function TradePage() {
         entry: parseFloat(pos.entry_price),
         size: parseFloat(pos.size),
         swap: 0.00,
-        time: new Date(pos.created_at).toLocaleString()
+        time: new Date(pos.created_at).toLocaleString(),
+        take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
+        stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
       }));
     }
   } catch (err) {

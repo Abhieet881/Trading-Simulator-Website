@@ -16,9 +16,11 @@ CREATE TABLE IF NOT EXISTS public.users (
 CREATE TABLE IF NOT EXISTS public.wallets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
-    virtual_balance NUMERIC(12, 2) DEFAULT 10000.00 NOT NULL,
+    virtual_balance NUMERIC(12, 2) DEFAULT 0.00 NOT NULL,
     currency TEXT DEFAULT 'USD' NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    initial_balance NUMERIC(12, 2) DEFAULT 0.00 NOT NULL,
+    balance_configured BOOLEAN DEFAULT false NOT NULL
 );
 
 -- 3. Helper function to check if the current user is an admin without recursion
@@ -77,8 +79,11 @@ CREATE TABLE IF NOT EXISTS public.trades (
     pnl NUMERIC(16, 2),
     opened_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    closed_at TIMESTAMP WITH TIME ZONE
+    closed_at TIMESTAMP WITH TIME ZONE,
+    take_profit NUMERIC(16, 8),
+    stop_loss NUMERIC(16, 8)
 );
+
 
 -- Enable RLS for public.trades
 ALTER TABLE public.trades ENABLE ROW LEVEL SECURITY;

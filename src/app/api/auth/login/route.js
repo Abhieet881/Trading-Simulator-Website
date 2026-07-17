@@ -19,6 +19,9 @@ export async function POST(req) {
     });
 
     if (authError) {
+      if (authError.message === 'Email not confirmed') {
+        return NextResponse.json({ success: false, error: 'Email not confirmed', email: emailLower }, { status: 400 });
+      }
       const message = authError.message === 'Invalid login credentials' 
         ? 'Invalid email or password.' 
         : authError.message;
@@ -52,12 +55,39 @@ export async function POST(req) {
       if (!walletCheck) {
         await supabase.from('wallets').insert({
           user_id: authUser.id,
-          virtual_balance: 10000.00,
-          currency: 'USD'
+          virtual_balance: 0.00,
+          currency: 'USD',
+          initial_balance: 0.00,
+          balance_configured: false
         });
       }
-    } else if (userData.status !== 'active') {
-      // Account is inactive, sign out immediately
+    }
+
+    // Resolve status (check both Supabase and local DB fallback)
+    let status = userData?.status || 'active';
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        if (db.user_statuses && db.user_statuses[authUser.id]) {
+          status = db.user_statuses[authUser.id];
+        } else if (db.users) {
+          const localUser = db.users.find(u => u.id === authUser.id);
+          if (localUser && localUser.status) {
+            status = localUser.status;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to read local DB user status in login:', err);
+      }
+    }
+
+    if (status === 'suspended') {
+      await supabase.auth.signOut();
+      return NextResponse.json({ success: false, error: 'Your account has been suspended. Contact support.' }, { status: 401 });
+    } else if (status !== 'active') {
       await supabase.auth.signOut();
       return NextResponse.json({ success: false, error: 'Your account is inactive.' }, { status: 401 });
     }

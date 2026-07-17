@@ -53,6 +53,11 @@ export default async function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false });
 
+    // A2. Fetch wallets
+    const { data: dbWallets, error: walletsErr } = await supabase
+      .from('wallets')
+      .select('user_id, virtual_balance');
+
     // B. Fetch trades (all users)
     const { data: dbTrades, error: tradesErr } = await supabase
       .from('trades')
@@ -68,13 +73,21 @@ export default async function AdminPage() {
     if (tradesErr) throw tradesErr;
     if (compsErr) throw compsErr;
 
+    const walletBalanceMap = {};
+    if (dbWallets) {
+      dbWallets.forEach(w => {
+        walletBalanceMap[w.user_id] = parseFloat(w.virtual_balance);
+      });
+    }
+
     if (dbUsers) {
       totalUsers = dbUsers.length;
       usersList = dbUsers.map(u => {
         const userTrades = dbTrades ? dbTrades.filter(t => t.user_id === u.id) : [];
         return {
           ...u,
-          trade_count: userTrades.length
+          trade_count: userTrades.length,
+          virtual_balance: walletBalanceMap[u.id] !== undefined ? walletBalanceMap[u.id] : 10000.00
         };
       });
     }
@@ -83,7 +96,6 @@ export default async function AdminPage() {
       totalTrades = dbTrades.length;
       totalVolume = dbTrades.reduce((sum, t) => sum + parseFloat(t.usd_amount || 0), 0);
 
-      // Active Today: distinct user_id with trades placed/closed today
       const todayStr = new Date().toDateString();
       const activeUsers = new Set(
         dbTrades
@@ -111,18 +123,28 @@ export default async function AdminPage() {
     if (fs.existsSync(localDbPath)) {
       const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
       
-      const mockUsers = Object.keys(db.wallets || {}).map((uid, index) => {
-        const userTrades = db.trades.filter(t => t.user_id === uid);
-        const savedStatus = db.user_statuses?.[uid] || 'active';
-        return {
+      // Initialize persistent mock users list if not exists
+      if (!db.users) {
+        db.users = Object.keys(db.wallets || {}).map((uid, index) => ({
           id: uid,
           name: uid === user.id ? (user.user_metadata?.name || 'Abhijeet Patil') : `Sim User ${index + 1}`,
           email: uid === user.id ? user.email : `user${index + 1}@example.com`,
           plan_type: uid === user.id ? 'premium' : 'free',
-          status: savedStatus,
+          status: db.user_statuses?.[uid] || 'active',
           is_admin: uid === user.id ? true : false,
-          created_at: new Date(Date.now() - index * 86400000 * 2.5).toISOString(),
-          trade_count: userTrades.length
+          created_at: new Date(Date.now() - index * 86400000 * 2.5).toISOString()
+        }));
+        fs.writeFileSync(localDbPath, JSON.stringify(db, null, 2));
+      }
+
+      const mockUsers = db.users.map(u => {
+        const userTrades = db.trades ? db.trades.filter(t => t.user_id === u.id) : [];
+        const savedStatus = db.user_statuses?.[u.id] || u.status || 'active';
+        return {
+          ...u,
+          status: savedStatus,
+          trade_count: userTrades.length,
+          virtual_balance: db.wallets[u.id] !== undefined ? db.wallets[u.id] : 10000.00
         };
       });
 
@@ -164,7 +186,7 @@ export default async function AdminPage() {
   // Aggregate signups data (daily signups counts)
   const signupsByDate = {};
   initialUsers.forEach(u => {
-    const dateStr = new Date(u.created_at).toLocaleDateString(undefined, {
+    const dateStr = new Date(u.created_at).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric'
     });

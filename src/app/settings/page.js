@@ -40,31 +40,46 @@ export default async function SettingsPage() {
   const planType = dbUser?.plan_type || 'free';
 
   // 3. Fetch user wallet balance (with local JSON fallback)
-  let balance = 10000.00;
+  let balance = 0.00;
+  let initialConfiguredBalance = 10000.00;
   try {
     const { data: dbWallet, error: dbWalletError } = await supabase
       .from('wallets')
-      .select('virtual_balance')
+      .select('virtual_balance, initial_balance')
       .eq('user_id', user.id)
       .single();
 
     if (dbWalletError) {
-      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist')) {
+      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
         const fs = require('fs');
         const path = require('path');
         const localDbPath = path.join(process.cwd(), 'local_db.json');
         if (fs.existsSync(localDbPath)) {
           const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 10000.00;
+          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+          initialConfiguredBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 10000.00;
         }
       } else {
         throw dbWalletError;
       }
     } else if (dbWallet) {
-      balance = parseFloat(dbWallet.virtual_balance);
+      balance = parseFloat(dbWallet.virtual_balance || 0);
+      initialConfiguredBalance = parseFloat(dbWallet.initial_balance || 10000.00);
     }
   } catch (err) {
     console.error('Failed to fetch wallet in settings server load:', err);
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+        initialConfiguredBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 10000.00;
+      } catch (e) {
+        console.error(e);
+      }
+    }
   }
 
   return (
@@ -75,6 +90,7 @@ export default async function SettingsPage() {
       initialCreatedAt={createdAt}
       initialPlanType={planType}
       initialBalance={balance}
+      initialConfiguredBalance={initialConfiguredBalance}
     />
   );
 }
