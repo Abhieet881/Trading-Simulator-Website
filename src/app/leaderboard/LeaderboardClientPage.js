@@ -7,7 +7,7 @@ import {
   User, CheckCircle2, ChevronRight, HelpCircle, 
   Loader2, Info, Star, Percent, Briefcase
 } from 'lucide-react';
-import UserDropdown from '../dashboard/UserDropdown';
+import Navbar from '@/components/Navbar';
 
 export default function LeaderboardClientPage({ 
   currentUserId, 
@@ -184,42 +184,7 @@ export default function LeaderboardClientPage({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-between font-sans text-gray-800">
-      {/* Top Navbar */}
-      <header className="border-b border-[#E5E7EB] bg-white sticky top-0 z-50 shadow-sm select-none">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <TrendingUp className="text-white w-4.5 h-4.5" />
-            </div>
-            <span className="font-bold text-lg tracking-tight text-[#111111]">PaperPulse</span>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/dashboard" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/trade" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Trade
-            </Link>
-            <Link href="/history" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              History
-            </Link>
-            <Link href="/leaderboard" className="text-sm font-semibold text-[#2563EB] transition-colors">
-              Leaderboard
-            </Link>
-            <Link href="/competitions" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Competitions
-            </Link>
-          </nav>
-
-          {/* User Profile dropdown */}
-          <div className="flex items-center gap-4">
-            <UserDropdown userName={userName} />
-          </div>
-        </div>
-      </header>
+      <Navbar userName={userName} />
 
       {/* Main leader board area */}
       <main className="max-w-6xl mx-auto px-6 py-10 flex-grow w-full pb-28">
@@ -307,11 +272,11 @@ export default function LeaderboardClientPage({
           ) : rankedUsers.length > 0 ? (
             <div className="space-y-10">
               {/* TOP 3 PODIUM SECTION */}
-              <div className="flex justify-center items-end gap-4 md:gap-8 max-w-2xl mx-auto pt-6 select-none">
+              <div className="flex flex-col sm:flex-row justify-center items-center sm:items-end gap-6 sm:gap-4 md:gap-8 max-w-2xl mx-auto pt-6 select-none">
                 
                 {/* #2 Place (Silver) */}
                 {secondPlace ? (
-                  <div className="flex flex-col items-center w-28 md:w-36 text-center animate-in slide-in-from-bottom-3 duration-300">
+                  <div className="flex flex-col items-center w-28 md:w-36 text-center animate-in slide-in-from-bottom-3 duration-300 order-2 sm:order-1">
                     <div className="relative mb-3">
                       <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center text-gray-500 font-bold shadow-md">
                         <User className="w-6 h-6 md:w-8 md:h-8 text-gray-400" />
@@ -327,17 +292,17 @@ export default function LeaderboardClientPage({
                       +${secondPlace.total_pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                     
-                    <div className="w-full bg-[#E5E7EB] border-t-2 border-gray-300 rounded-t-xl h-20 mt-4 flex items-center justify-center shadow-inner">
+                    <div className="w-full bg-[#E5E7EB] border-t-2 border-gray-300 rounded-t-xl h-20 mt-4 hidden sm:flex items-center justify-center shadow-inner">
                       <span className="text-2xl font-black text-gray-400 select-none">🥈</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="w-28 md:w-36 h-20"></div>
+                  <div className="w-28 md:w-36 h-20 hidden sm:block"></div>
                 )}
 
                 {/* #1 Place (Gold - Center/Larger) */}
                 {firstPlace ? (
-                  <div className="flex flex-col items-center w-32 md:w-44 text-center z-10 animate-in slide-in-from-bottom-5 duration-300">
+                  <div className="flex flex-col items-center w-32 md:w-44 text-center z-10 animate-in slide-in-from-bottom-5 duration-300 order-1 sm:order-2">
                     <div className="relative mb-3">
                       <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-amber-50 border-4 border-amber-400 flex items-center justify-center text-amber-500 font-bold shadow-lg">
                         <Trophy className="w-8 h-8 md:w-10 md:h-10 text-amber-500 animate-bounce" />
@@ -353,17 +318,17 @@ export default function LeaderboardClientPage({
                       +${firstPlace.total_pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                     
-                    <div className="w-full bg-[#FCD34D] border-t-2 border-amber-400 rounded-t-xl h-28 mt-4 flex items-center justify-center shadow-inner">
+                    <div className="w-full bg-[#FCD34D] border-t-2 border-amber-400 rounded-t-xl h-28 mt-4 hidden sm:flex items-center justify-center shadow-inner">
                       <span className="text-3xl font-black text-amber-600 select-none">🏆</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="w-32 md:w-44 h-28"></div>
+                  <div className="w-32 md:w-44 h-28 hidden sm:block"></div>
                 )}
 
                 {/* #3 Place (Bronze) */}
                 {thirdPlace ? (
-                  <div className="flex flex-col items-center w-28 md:w-36 text-center animate-in slide-in-from-bottom-3 duration-300">
+                  <div className="flex flex-col items-center w-28 md:w-36 text-center animate-in slide-in-from-bottom-3 duration-300 order-3 sm:order-3">
                     <div className="relative mb-3">
                       <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#FFFBEB] border-2 border-amber-600 flex items-center justify-center text-amber-700 font-bold shadow-md">
                         <User className="w-6 h-6 md:w-8 md:h-8 text-amber-700/60" />
@@ -379,12 +344,12 @@ export default function LeaderboardClientPage({
                       +${thirdPlace.total_pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                     
-                    <div className="w-full bg-[#E5D5C5] border-t-2 border-amber-600 rounded-t-xl h-16 mt-4 flex items-center justify-center shadow-inner">
+                    <div className="w-full bg-[#E5D5C5] border-t-2 border-amber-600 rounded-t-xl h-16 mt-4 hidden sm:flex items-center justify-center shadow-inner">
                       <span className="text-2xl font-black text-amber-700 select-none">🥉</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="w-28 md:w-36 h-16"></div>
+                  <div className="w-28 md:w-36 h-16 hidden sm:block"></div>
                 )}
               </div>
 

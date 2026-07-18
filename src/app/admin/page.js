@@ -63,11 +63,21 @@ export default async function AdminPage() {
       .from('trades')
       .select('*');
 
-    // C. Fetch competitions
+    // C. Fetch competitions & participant counts
     const { data: dbComps, error: compsErr } = await supabase
       .from('competitions')
       .select('*')
       .order('created_at', { ascending: false });
+
+    let dbParticipants = [];
+    try {
+      const { data: participantsData } = await supabase
+        .from('competition_participants')
+        .select('competition_id');
+      dbParticipants = participantsData || [];
+    } catch (e) {
+      console.warn('Failed to fetch participants count:', e.message);
+    }
 
     if (usersErr) throw usersErr;
     if (tradesErr) throw tradesErr;
@@ -110,7 +120,14 @@ export default async function AdminPage() {
     }
 
     if (dbComps) {
-      competitionsList = dbComps;
+      const participantCountMap = {};
+      dbParticipants.forEach(p => {
+        participantCountMap[p.competition_id] = (participantCountMap[p.competition_id] || 0) + 1;
+      });
+      competitionsList = dbComps.map(c => ({
+        ...c,
+        participantCount: participantCountMap[c.id] || 0
+      }));
     }
   } catch (err) {
     console.warn('Supabase admin data query failed, falling back to local database:', err.message);
@@ -168,7 +185,15 @@ export default async function AdminPage() {
         activeToday = activeUsers.size;
       }
 
-      competitionsList = db.competitions || [];
+      const localParticipants = db.competition_participants || [];
+      const participantCountMap = {};
+      localParticipants.forEach(p => {
+        participantCountMap[p.competition_id] = (participantCountMap[p.competition_id] || 0) + 1;
+      });
+      competitionsList = (db.competitions || []).map(c => ({
+        ...c,
+        participantCount: participantCountMap[c.id] || 0
+      }));
     }
   }
 

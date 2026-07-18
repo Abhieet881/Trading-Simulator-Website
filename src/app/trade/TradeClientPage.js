@@ -182,7 +182,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [searchQuery, setSearchQuery] = useState('');
   const [tableTab, setTableTab] = useState('positions');
-  const [watchlistTab, setWatchlistTab] = useState('Watchlist');
+  const [watchlistTab, setWatchlistTab] = useState('All');
 
   // Search dialog visibility
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -275,8 +275,8 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   };
 
   const totalFloatingPnL = positions.reduce((sum, pos) => sum + getPositionPnL(pos), 0);
-  const activeEquity = balance + totalFloatingPnL;
-  const activeMargin = positions.length > 0 ? 1500.00 : 0.00;
+  const activeMargin = positions.reduce((sum, pos) => sum + (pos.usd_amount || 0), 0);
+  const activeEquity = balance + activeMargin + totalFloatingPnL;
   const freeMargin = activeEquity - activeMargin;
 
   // Track selected price ticking flash effect
@@ -713,10 +713,10 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
     const tvInterval = tvIntervals[timeframe] || '60';
 
     const tvStyles = {
-      'candles': '1',
-      'line': '2'
+      'candles': 1,
+      'line': 2
     };
-    const tvStyle = tvStyles[chartType] || '1';
+    const tvStyle = tvStyles[chartType] || 1;
 
     // Clear previous containers to avoid duplicate instances
     chartContainerRef.current.innerHTML = '';
@@ -742,12 +742,451 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
         allow_symbol_change: true,
         container_id: widgetId,
         studies: [],
-        show_popup_button: false,
+        show_popup_button: false
       });
     } catch (err) {
       console.error('Failed to create TradingView widget:', err);
     }
   }, [scriptLoaded, selectedAsset, timeframe, chartType]);
+
+  const renderWatchlist = () => {
+    return (
+      <div className="flex flex-col h-full overflow-hidden select-none bg-white">
+        <div className="p-2 bg-[#FAFAFA] border-b border-gray-100 flex items-center justify-between shrink-0 select-none">
+          <span className="font-bold text-[10px] text-gray-500 uppercase tracking-wider">Watchlist</span>
+          <div className="text-[10px] font-bold flex gap-2 text-gray-400">
+            {['All', 'Forex', 'Stocks', 'Crypto'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setWatchlistTab(tab)}
+                className={`cursor-pointer transition-all uppercase tracking-wider ${
+                  watchlistTab === tab ? 'text-[#2563EB] font-bold' : 'hover:text-gray-600'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Watchlist Table */}
+        <div className="flex-grow overflow-y-auto px-2">
+          <table className="w-full text-left border-collapse text-[10px] font-sans">
+            <thead>
+              <tr className="border-b border-gray-100 text-[#9CA3AF] font-bold uppercase text-[7.5px] tracking-wider sticky top-0 bg-white z-10 py-1">
+                <th className="py-1">Symbol</th>
+                <th className="py-1 text-right">Last</th>
+                <th className="py-1 text-right">% Chg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.values(ASSETS)
+                .filter(item => {
+                  if (watchlistTab === 'Forex' && item.type !== 'Forex') return false;
+                  if (watchlistTab === 'Crypto' && item.type !== 'Crypto') return false;
+                  if (watchlistTab === 'Stocks' && item.type !== 'Stocks') return false;
+                  return true;
+                })
+                .map((item) => {
+                  const buyPrice = prices[item.symbol];
+                  const changePct = getChangePercent(item.symbol);
+                  const isUp = changePct >= 0;
+                  const isSelected = selectedAsset === item.symbol;
+
+                  return (
+                    <tr
+                      key={item.symbol}
+                      onClick={() => handleAssetChange(item.symbol)}
+                      className={`cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                        isSelected ? 'bg-[#2563EB]/5 font-bold border-l-2 border-l-[#2563EB]' : ''
+                      }`}
+                    >
+                      <td className="py-1.5 px-1 font-bold text-gray-900">
+                        <div>{item.symbol}/USDT</div>
+                      </td>
+                      <td className="py-1.5 text-right font-mono text-gray-700 tabular-nums">
+                        {formatAssetPrice(buyPrice, item.symbol)}
+                      </td>
+                      <td className={`py-1.5 text-right font-mono font-bold tabular-nums ${
+                        isUp ? 'text-[#089981]' : 'text-[#f23645]'
+                      }`}>
+                        {isUp ? '+' : ''}{changePct.toFixed(2)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderOrderPanel = () => {
+    const buyPrice = livePrice;
+    const sellPrice = buyPrice * 0.9999;
+    const rawSpread = buyPrice - sellPrice;
+    const spreadStr = selectedAsset.includes('/') ? rawSpread.toFixed(4) : rawSpread.toFixed(2);
+    
+    const getAssetColor = (symbol) => {
+      switch (symbol) {
+        case 'BTC': return '#F0B90B';
+        case 'ETH': return '#627EEA';
+        case 'EUR/USD': return '#003399';
+        case 'GBP/USD': return '#C8102E';
+        case 'XAU/USD': return '#D4AF37';
+        case 'AAPL': return '#A3AAAE';
+        default: return '#2563EB';
+      }
+    };
+
+    return (
+      <div className="flex flex-col h-full bg-white text-gray-900 border-t lg:border-t-0 border-[#E0E3EB] overflow-hidden select-none">
+        
+        {/* HEADER & BUY/SELL SWITCH ROW (Pinned at top) */}
+        <div className="p-3 pb-2 shrink-0 border-b border-gray-100 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between select-none">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: getAssetColor(selectedAsset) }}>
+                {selectedAsset[0]}
+              </span>
+              <span className="font-extrabold text-xs text-gray-900 tracking-wide">{selectedAsset}</span>
+            </div>
+            <button 
+              type="button"
+              className="text-gray-400 hover:text-gray-700 transition-colors p-0.5 cursor-pointer" 
+              title="Close Panel" 
+              onClick={() => showToast('Order panel cannot be collapsed in this view.', 'info')}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* SELL/BUY SPLIT BUTTON ROW */}
+          <div className="relative mt-0.5 select-none">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Sell Button */}
+              <button
+                type="button"
+                onClick={() => { setOrderType('sell'); setErrorMsg(''); }}
+                className={`h-[48px] border rounded-md text-left px-3 py-1.5 transition-all flex flex-col justify-between cursor-pointer ${
+                  orderType === 'sell'
+                    ? 'bg-[#f23645] text-white border-[#f23645] shadow-sm'
+                    : 'bg-transparent text-[#f23645] border-[#f23645]/30 hover:bg-[#f23645]/5'
+                }`}
+              >
+                <span className={`text-[8px] uppercase font-bold tracking-wider ${orderType === 'sell' ? 'text-white/80' : 'text-gray-400'}`}>Sell</span>
+                <span className="font-mono font-bold text-xs tabular-nums">{formatAssetPrice(sellPrice)}</span>
+              </button>
+
+              {/* Buy Button */}
+              <button
+                type="button"
+                onClick={() => { setOrderType('buy'); setErrorMsg(''); }}
+                className={`h-[48px] border rounded-md text-left px-3 py-1.5 transition-all flex flex-col justify-between cursor-pointer ${
+                  orderType === 'buy'
+                    ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-sm'
+                    : 'bg-transparent text-[#2563EB] border-[#2563EB]/30 hover:bg-[#2563EB]/5'
+                }`}
+              >
+                <span className={`text-[8px] uppercase font-bold tracking-wider ${orderType === 'buy' ? 'text-white/80' : 'text-gray-400'}`}>Buy</span>
+                <span className="font-mono font-bold text-xs tabular-nums">{formatAssetPrice(buyPrice)}</span>
+              </button>
+            </div>
+
+            {/* Spread Badge centered */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none mt-2.5">
+              <span className="bg-white border border-[#E0E3EB] text-gray-700 text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm font-mono tabular-nums">
+                {spreadStr} USD
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* MIDDLE SCROLLABLE FORM FIELDS */}
+        <div className="flex-grow overflow-y-auto p-3 py-2.5 space-y-3.5 scrollbar-thin">
+          
+          {/* Regular form dropdown */}
+          <div className="relative shrink-0 select-none">
+            <button type="button" className="w-full bg-[#FAFAFA] border border-[#E0E3EB] rounded-md py-1.5 px-3 flex items-center justify-between text-xs text-gray-700 font-bold hover:bg-gray-50 transition-colors cursor-pointer">
+              <span>Regular form</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Volume Sentiment Indicator */}
+          <div className="select-none">
+            <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden flex">
+              <div className="bg-[#f23645]" style={{ width: '62%' }} />
+              <div className="bg-[#2563EB]" style={{ width: '38%' }} />
+            </div>
+            <div className="flex justify-between text-[8px] font-extrabold text-gray-400 mt-1 font-mono tracking-wider">
+              <span className="text-[#f23645]">SELL 62%</span>
+              <span className="text-[#2563EB]">BUY 38%</span>
+            </div>
+          </div>
+
+          {/* ORDER TYPE TABS */}
+          <div className="bg-gray-100 p-0.5 rounded-lg flex select-none">
+            <button
+              type="button"
+              onClick={() => { setOrderSubtype('Market'); }}
+              className={`w-1/2 py-1 rounded-md text-center font-bold text-[9.5px] uppercase tracking-wider cursor-pointer transition-all ${
+                orderSubtype === 'Market' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-700'
+              }`}
+            >
+              Market
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (orderSubtype === 'Market') setOrderSubtype('Limit'); }}
+              className={`w-1/2 py-1 rounded-md text-center font-bold text-[9.5px] uppercase tracking-wider cursor-pointer transition-all ${
+                orderSubtype !== 'Market' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-700'
+              }`}
+            >
+              Pending
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {/* Pending Type selector */}
+            {orderSubtype !== 'Market' && (
+              <div className="flex gap-2 items-center justify-between select-none">
+                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Pending Type</span>
+                <select
+                  value={orderSubtype}
+                  onChange={(e) => setOrderSubtype(e.target.value)}
+                  className="bg-[#FAFAFA] border border-[#E0E3EB] text-gray-700 text-[10px] font-bold rounded-md px-2 py-0.5 focus:outline-none focus:border-[#2563EB] cursor-pointer"
+                >
+                  <option value="Limit">Limit Order</option>
+                  <option value="Stop-Limit">Stop-Limit Order</option>
+                </select>
+              </div>
+            )}
+
+            {/* Pending Price Inputs */}
+            {orderSubtype !== 'Market' && (
+              <div className="flex flex-col gap-1">
+                <label className="block text-[9px] text-gray-400 uppercase tracking-wider font-extrabold">Price (USDT)</label>
+                <div className="flex items-center bg-[#FAFAFA] border border-[#E0E3EB] rounded-md px-3 h-8 focus-within:border-[#2563EB] transition-colors">
+                  <input
+                    type="text"
+                    value={limitPrice}
+                    onChange={(e) => handlePriceInput(e.target.value)}
+                    className="w-full bg-transparent border-none text-xs font-bold font-mono text-gray-900 focus:outline-none focus:ring-0 p-0"
+                  />
+                  <div className="flex items-center gap-2 select-none">
+                    <button type="button" onClick={() => adjustPrice('limit', false)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <button type="button" onClick={() => adjustPrice('limit', true)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {orderSubtype === 'Stop-Limit' && (
+              <div className="flex flex-col gap-1">
+                <label className="block text-[9px] text-gray-400 uppercase tracking-wider font-extrabold">Stop Price (USDT)</label>
+                <div className="flex items-center bg-[#FAFAFA] border border-[#E0E3EB] rounded-md px-3 h-8 focus-within:border-[#2563EB] transition-colors">
+                  <input
+                    type="text"
+                    value={stopPrice}
+                    onChange={(e) => setStopPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="w-full bg-transparent border-none text-xs font-bold font-mono text-gray-900 focus:outline-none focus:ring-0 p-0"
+                  />
+                  <div className="flex items-center gap-2 select-none">
+                    <button type="button" onClick={() => adjustPrice('stop', false)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <button type="button" onClick={() => adjustPrice('stop', true)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VOLUME FIELD */}
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[9px] text-gray-400 uppercase tracking-wider font-extrabold">
+                <span>Volume</span>
+              </div>
+              <div className="flex items-center bg-[#FAFAFA] border border-[#E0E3EB] rounded-md px-3 h-8 focus-within:border-[#2563EB] transition-colors">
+                <input
+                  type="text"
+                  value={vol}
+                  onChange={(e) => handleVolInput(e.target.value)}
+                  className="w-full bg-transparent border-none text-xs font-bold font-mono text-gray-900 focus:outline-none focus:ring-0 p-0"
+                />
+                <span className="text-[10px] font-bold text-gray-400 mr-2 select-none">Lots</span>
+                <div className="flex items-center gap-2 select-none">
+                  <button type="button" onClick={() => adjustVol(false)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" onClick={() => adjustVol(true)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Size Quick Percentages */}
+            <div className="grid grid-cols-4 gap-1 text-[9px] font-bold text-gray-400 select-none">
+              {[25, 50, 75, 100].map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => handleSliderChange(pct)}
+                  className="py-1 rounded bg-[#FAFAFA] hover:bg-gray-100 border border-[#E0E3EB] text-center cursor-pointer font-bold text-[9.5px] text-gray-500 transition-colors"
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+
+            {/* Leverage exposure range slider */}
+            <div className="flex flex-col gap-1 select-none border-t border-gray-100 pt-2.5">
+              <div className="flex justify-between items-center text-[9px] text-gray-400 uppercase tracking-wider font-extrabold">
+                <span>Leverage exposure</span>
+                <span className="font-mono font-bold text-[#2563EB]">{leverage}x</span>
+              </div>
+              <div className="flex items-center gap-3 px-1 mt-0.5">
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  value={leverage}
+                  onChange={(e) => setLeverage(parseInt(e.target.value))}
+                  className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2563EB]"
+                />
+              </div>
+              <div className="flex justify-between text-[7px] font-bold text-gray-300 px-1">
+                <span>1x</span>
+                <span>20x</span>
+                <span>50x</span>
+                <span>100x</span>
+              </div>
+            </div>
+
+            {/* TAKE PROFIT FIELD */}
+            <div className="flex flex-col gap-1 border-t border-gray-100 pt-2.5">
+              <div className="flex justify-between items-center text-[9px] text-gray-400 uppercase tracking-wider font-extrabold">
+                <span className="flex items-center gap-1">
+                  Take Profit
+                  <button type="button" title="Take Profit info" onClick={() => showToast('Take Profit order will trigger automatically when asset price hits this rate to lock gains.', 'info')} className="text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+                    <HelpCircle className="w-3 h-3" />
+                  </button>
+                </span>
+              </div>
+              <div className="flex items-center bg-[#FAFAFA] border border-[#E0E3EB] rounded-md px-3 h-8 focus-within:border-[#2563EB] transition-colors">
+                <input
+                  type="text"
+                  value={tpPrice}
+                  placeholder="Not set"
+                  onChange={(e) => setTpPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="w-full bg-transparent border-none text-xs font-bold font-mono text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0 p-0"
+                />
+                <div className="flex items-center bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-gray-600 mr-2 select-none gap-0.5 cursor-pointer hover:bg-gray-200 hover:text-gray-800 transition-colors">
+                  <span>Price</span>
+                  <ChevronDown className="w-2.5 h-2.5 text-gray-400" />
+                </div>
+                <div className="flex items-center gap-2 select-none">
+                  <button type="button" onClick={() => adjustTp(false)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <button type="button" onClick={() => adjustTp(true)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* STOP LOSS FIELD */}
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[9px] text-gray-400 uppercase tracking-wider font-extrabold">
+                <span className="flex items-center gap-1">
+                  Stop Loss
+                  <button type="button" title="Stop Loss info" onClick={() => showToast('Stop Loss order will trigger automatically when asset price hits this rate to protect capital.', 'info')} className="text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+                    <HelpCircle className="w-3 h-3" />
+                  </button>
+                </span>
+              </div>
+              <div className="flex items-center bg-[#FAFAFA] border border-[#E0E3EB] rounded-md px-3 h-8 focus-within:border-[#2563EB] transition-colors">
+                <input
+                  type="text"
+                  value={slPrice}
+                  placeholder="Not set"
+                  onChange={(e) => setSlPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="w-full bg-transparent border-none text-xs font-bold font-mono text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0 p-0"
+                />
+                <div className="flex items-center bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-gray-600 mr-2 select-none gap-0.5 cursor-pointer hover:bg-gray-200 hover:text-gray-800 transition-colors">
+                  <span>Price</span>
+                  <ChevronDown className="w-2.5 h-2.5 text-gray-400" />
+                </div>
+                <div className="flex items-center gap-2 select-none">
+                  <button type="button" onClick={() => adjustSl(false)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <button type="button" onClick={() => adjustSl(true)} className="text-gray-400 hover:text-gray-700 font-bold p-1 transition-colors cursor-pointer">
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="flex items-center gap-1 text-[9px] text-[#f23645] font-bold mt-0.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SUBMIT BUTTON & FOOTER STATS (Pinned at bottom) */}
+        <div className="p-3 pt-2 border-t border-gray-100 select-none font-bold bg-[#FAFAFA] shrink-0">
+          {/* Available Balance */}
+          <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-2 select-none">
+            <span>Available Balance</span>
+            <span className="text-gray-900 font-mono font-bold">{parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handlePlaceOrder}
+            disabled={!!errorMsg || !totalUSDT || parseFloat(totalUSDT) <= 0}
+            className="w-full text-white py-2 rounded-md font-bold mb-2.5 transition-colors cursor-pointer text-xs disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider min-h-[44px] flex items-center justify-center animate-fade-in"
+            style={{
+              backgroundColor: orderType === 'buy' ? '#2563EB' : '#f23645'
+            }}
+          >
+            {orderType === 'buy' ? `Buy ${selectedAsset}` : `Sell ${selectedAsset}`}
+          </button>
+          
+          {/* Account/Margin details */}
+          <div className="text-[10px] space-y-1 text-gray-400 font-bold">
+            <div className="flex justify-between">
+              <span>Margin Required:</span>
+              <span className="text-gray-700 font-mono">{(getOrderValueUSD() / leverage).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Free Margin:</span>
+              <span className="text-gray-700 font-mono">{freeMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Account Equity:</span>
+              <span className="text-gray-700 font-mono">{parseFloat(activeEquity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    );
+  };
+
 
   // Tick last candle in real time with live prices
   useEffect(() => {
@@ -1006,10 +1445,10 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
       </div>
 
       {/* Main Trading Platform Grid */}
-      <div className="flex-grow flex overflow-hidden w-full relative">
+      <div className="flex-grow flex overflow-y-auto lg:overflow-hidden flex-col lg:flex-row w-full relative">
         
         {/* Far Left Drawing Toolbar (TradingView Style) */}
-        <aside className="w-11 bg-white border-r border-[#E0E3EB] flex flex-col items-center py-2 justify-between shrink-0 select-none">
+        <aside className="hidden lg:flex w-11 bg-white border-r border-[#E0E3EB] flex-col items-center py-2 justify-between shrink-0 select-none">
           <div className="flex flex-col items-center gap-2 w-full px-1">
             <button 
               title="Crosshair Cursor" 
@@ -1095,6 +1534,11 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
+        </aside>
+
+        {/* LEFT Column: Watchlist Panel */}
+        <aside className="hidden lg:flex w-[16%] min-w-[200px] max-w-[260px] bg-white border-r border-[#E0E3EB] flex-col overflow-hidden h-full shrink-0">
+          {renderWatchlist()}
         </aside>
 
         {/* Center and Left Work Area (Chart & Bottom Terminal) */}
@@ -1410,7 +1854,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
             <div className="p-2 bg-[#FAFAFA] border-b border-gray-100 flex items-center justify-between shrink-0 select-none">
               <span className="font-bold text-[10px] text-gray-500 uppercase tracking-wider">Watchlist</span>
               <div className="text-[10px] font-bold flex gap-2 text-gray-400">
-                {['Watchlist', 'Forex', 'Stocks', 'Crypto'].map(tab => (
+                {['All', 'Forex', 'Stocks', 'Crypto'].map(tab => (
                   <button
                     key={tab}
                     onClick={() => setWatchlistTab(tab)}
@@ -1823,7 +2267,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                     </div>
                     <div className="flex justify-between">
                       <span>Free Margin:</span>
-                      <span className="text-gray-700 font-mono">{(activeEquity - (getOrderValueUSD() / leverage)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+                      <span className="text-gray-700 font-mono">{freeMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Account Equity:</span>

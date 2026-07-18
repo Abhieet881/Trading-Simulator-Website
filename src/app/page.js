@@ -427,12 +427,12 @@ export default function Home() {
               </div>
 
               {/* Main Content: Chart + Orderbook Grid */}
-              <div className="grid grid-cols-[1fr_200px] gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-3">
                 {/* Left Side: Candlestick Chart */}
                 <div ref={chartContainerRef} className="h-[240px] min-w-0 bg-[#161A1E]" />
 
                 {/* Right Side: Orderbook */}
-                <div className="flex flex-col justify-between h-[240px] text-[11px] font-mono border-l border-[#2B3139] pl-3">
+                <div className="flex flex-col justify-between h-[240px] text-[11px] font-mono border-t md:border-t-0 border-l-0 md:border-l border-[#2B3139] pt-3 md:pt-0 pl-0 md:pl-3">
                   {/* Orderbook Header */}
                   <div className="flex justify-between text-[#707A8A] font-sans text-[10px] pb-1 border-b border-[#2B3139]/50">
                     <span>Price(USDT)</span>

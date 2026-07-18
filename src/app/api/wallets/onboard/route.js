@@ -22,20 +22,40 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid amount. Minimum is $100 and maximum is $1,000,000.' }, { status: 400 });
     }
 
-    // 3. Update wallet in Supabase
+    // 3. Update or Insert wallet in Supabase (Select-then-Insert-or-Update pattern)
     let updateError = null;
     try {
-      const { error } = await supabase
+      const { data: existingWallet, error: fetchError } = await supabase
         .from('wallets')
-        .update({
-          virtual_balance: numAmount,
-          initial_balance: numAmount,
-          balance_configured: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (!existingWallet) {
+        const { error: insertError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: user.id,
+            virtual_balance: numAmount,
+            initial_balance: numAmount,
+            balance_configured: true,
+            updated_at: new Date().toISOString()
+          });
+        if (insertError) throw insertError;
+      } else {
+        const { error: updateErr } = await supabase
+          .from('wallets')
+          .update({
+            virtual_balance: numAmount,
+            initial_balance: numAmount,
+            balance_configured: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+        if (updateErr) throw updateErr;
+      }
     } catch (e) {
       updateError = e;
     }

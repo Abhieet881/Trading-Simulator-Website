@@ -33,8 +33,8 @@ function writeLocalDb(db) {
 // Local helper to place trade order
 function handleLocalPost(userId, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss }) {
   const db = readLocalDb();
-  const balance = db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00;
-  const numUsdAmount = parseFloat(usd_amount);
+  const balance = parseFloat(db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00) || 0;
+  const numUsdAmount = parseFloat(usd_amount) || 0;
 
   if (balance < numUsdAmount) {
     return NextResponse.json({ error: 'Required margin/amount exceeds available balance' }, { status: 400 });
@@ -91,7 +91,13 @@ function handleLocalPut(userId, { tradeId, exitPrice }) {
   const entryPrice = parseFloat(trade.entry_price);
   const usdAmount = parseFloat(trade.usd_amount);
 
-  const multiplier = ['EUR/USD', 'GBP/USD'].includes(trade.symbol) ? 100000 : (trade.symbol === 'XAU/USD' ? 100 : 1);
+  const getMultiplier = (symbol) => {
+    if (['EUR/USD', 'GBP/USD'].includes(symbol)) return 100000;
+    if (symbol === 'XAU/USD') return 100;
+    if (symbol === 'AAPL') return 100;
+    return 1;
+  };
+  const multiplier = getMultiplier(trade.symbol);
   
   let pnl = 0;
   if (trade.side.toLowerCase() === 'buy') {
@@ -265,7 +271,7 @@ export async function POST(request) {
       throw walletError;
     }
 
-    const balance = parseFloat(wallet.virtual_balance);
+    const balance = parseFloat(wallet.virtual_balance) || 0;
     if (balance < numUsdAmount) {
       return NextResponse.json({ error: 'Required margin/amount exceeds available balance' }, { status: 400 });
     }
@@ -378,7 +384,13 @@ export async function PUT(request) {
     const usdAmount = parseFloat(trade.usd_amount || 0);
     
     // Leverage multiplier
-    const multiplier = ['EUR/USD', 'GBP/USD'].includes(trade.symbol) ? 100000 : (trade.symbol === 'XAU/USD' ? 100 : 1);
+    const getMultiplier = (symbol) => {
+      if (['EUR/USD', 'GBP/USD'].includes(symbol)) return 100000;
+      if (symbol === 'XAU/USD') return 100;
+      if (symbol === 'AAPL') return 100;
+      return 1;
+    };
+    const multiplier = getMultiplier(trade.symbol);
     
     let pnl = 0;
     if (trade.side.toLowerCase() === 'buy') {

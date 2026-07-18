@@ -6,7 +6,7 @@ import {
   ArrowRight 
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
-import UserDropdown from './UserDropdown';
+import Navbar from '@/components/Navbar';
 import OnboardingBalanceSelector from './OnboardingBalanceSelector';
 
 export default async function DashboardPage() {
@@ -137,57 +137,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-between">
-      {/* Top Navbar */}
-      <header className="border-b border-[#E5E7EB] bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <TrendingUp className="text-white w-4.5 h-4.5" />
-            </div>
-            <span className="font-bold text-lg tracking-tight text-[#111111]">PaperPulse</span>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link 
-              href="/dashboard" 
-              className="text-sm font-semibold text-[#2563EB] transition-colors"
-            >
-              Dashboard
-            </Link>
-            <Link 
-              href="/trade" 
-              className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors"
-            >
-              Trade
-            </Link>
-            <Link 
-              href="/history" 
-              className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors"
-            >
-              History
-            </Link>
-            <Link 
-              href="/leaderboard" 
-              className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors"
-            >
-              Leaderboard
-            </Link>
-            <Link 
-              href="/competitions" 
-              className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors"
-            >
-              Competitions
-            </Link>
-          </nav>
-
-          {/* User Profile Dropdown */}
-          <div className="flex items-center gap-4">
-            <UserDropdown userName={displayName} />
-          </div>
-        </div>
-      </header>
+      <Navbar userName={displayName} />
 
       {/* Main Dashboard Content */}
       <main className="max-w-6xl mx-auto px-6 py-10 flex-grow w-full">
@@ -308,7 +258,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs font-sans">
+              <table className="w-full text-left border-collapse text-xs font-sans min-w-[650px] md:min-w-0">
                 <thead>
                   <tr className="border-b border-gray-200 text-gray-400 font-bold uppercase text-[9px] tracking-wider">
                     <th className="py-2.5 px-3">Date</th>

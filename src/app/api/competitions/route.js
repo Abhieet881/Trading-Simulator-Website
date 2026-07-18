@@ -54,7 +54,7 @@ export async function GET(req) {
       // Fetch wallets to get latest balances
       const { data: wallets, error: walletsErr } = await supabase
         .from('wallets')
-        .select('user_id, virtual_balance');
+        .select('user_id, virtual_balance, balance_configured');
       if (walletsErr) throw walletsErr;
       dbWallets = wallets || [];
 
@@ -75,7 +75,8 @@ export async function GET(req) {
       // Map local wallets
       dbWallets = Object.entries(db.wallets || {}).map(([uid, bal]) => ({
         user_id: uid,
-        virtual_balance: bal
+        virtual_balance: bal,
+        balance_configured: db.wallets_configured?.[uid] || false
       }));
 
       // Mock users list based on active wallet keys
@@ -87,8 +88,10 @@ export async function GET(req) {
 
     // Map wallets and users for fast lookups
     const walletsMap = {};
+    const walletsConfiguredMap = {};
     dbWallets.forEach(w => {
       walletsMap[w.user_id] = parseFloat(w.virtual_balance);
+      walletsConfiguredMap[w.user_id] = w.balance_configured || false;
     });
 
     const usersMap = {};
@@ -97,7 +100,8 @@ export async function GET(req) {
     });
 
     // Sync user's own current_balance in the database if they are participating
-    const userWalletBalance = walletsMap[user.id] ?? 10000.00;
+    const userWalletBalance = walletsMap[user.id] ?? 0.00;
+    const balanceConfigured = walletsConfiguredMap[user.id] ?? false;
     
     // Find all participations of the current user
     const userParticipations = dbParticipants.filter(p => p.user_id === user.id);
@@ -197,7 +201,7 @@ export async function GET(req) {
     });
 
     // Map participant counts and user join status
-    const formattedCompetitions = activeOrUpcomingComps.map(c => {
+    const formattedCompetitions = dbCompetitions.map(c => {
       const participants = dbParticipants.filter(p => p.competition_id === c.id);
       const userPart = participants.find(p => p.user_id === user.id);
       
@@ -228,12 +232,13 @@ export async function GET(req) {
     });
 
     // Filter user's active joined competitions for "My Active Competitions" section
-    const myJoinedCompetitions = formattedCompetitions.filter(c => c.joined);
+    const myJoinedCompetitions = formattedCompetitions.filter(c => c.joined && new Date(c.end_date) >= now);
 
     return NextResponse.json({
       competitions: formattedCompetitions,
       myActiveCompetitions: myJoinedCompetitions,
-      userWalletBalance
+      userWalletBalance,
+      balanceConfigured
     });
 
   } catch (error) {
@@ -255,18 +260,20 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Competition ID is required' }, { status: 400 });
     }
 
-    // 1. Get competition details to find entry fee
+    // 1. Get competition details to find entry fee and starting equity
     let entryFee = 0;
+    let initialEquity = 10000;
     let isSupabase = true;
 
     try {
       const { data: comp, error: compErr } = await supabase
         .from('competitions')
-        .select('entry_fee')
+        .select('entry_fee, initial_equity')
         .eq('id', competitionId)
         .single();
       if (compErr) throw compErr;
       entryFee = comp ? parseFloat(comp.entry_fee) : 0;
+      initialEquity = comp && comp.initial_equity ? parseFloat(comp.initial_equity) : 10000;
     } catch (e) {
       console.warn('Failed to query competition from Supabase, check fallback:', e.message);
       isSupabase = false;
@@ -276,20 +283,23 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Competition not found' }, { status: 404 });
       }
       entryFee = comp.entry_fee ? parseFloat(comp.entry_fee) : 0;
+      initialEquity = comp.initial_equity ? parseFloat(comp.initial_equity) : 10000;
     }
 
     // 2. Get user's wallet virtual_balance
-    let userWalletBalance = 10000.00;
+    let userWalletBalance = 0.00;
+    let balanceConfigured = false;
     if (isSupabase) {
       try {
         const { data: wallet, error: walletErr } = await supabase
           .from('wallets')
-          .select('virtual_balance')
+          .select('virtual_balance, balance_configured')
           .eq('user_id', user.id)
           .single();
         if (walletErr) throw walletErr;
         if (wallet) {
           userWalletBalance = parseFloat(wallet.virtual_balance);
+          balanceConfigured = wallet.balance_configured || false;
         }
       } catch (e) {
         isSupabase = false;
@@ -298,7 +308,13 @@ export async function POST(req) {
 
     if (!isSupabase) {
       const db = getLocalDb();
-      userWalletBalance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 10000.00;
+      userWalletBalance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+      balanceConfigured = db.wallets_configured?.[user.id] || false;
+    }
+
+    // Check if user has configured starting balance
+    if (!balanceConfigured) {
+      return NextResponse.json({ error: 'Please set your starting balance on the Dashboard before joining a competition' }, { status: 400 });
     }
 
     // Check if user has sufficient balance for the entry fee
@@ -312,8 +328,8 @@ export async function POST(req) {
     const newParticipant = {
       competition_id: competitionId,
       user_id: user.id,
-      starting_balance: balanceAfterFee,
-      current_balance: balanceAfterFee,
+      starting_balance: initialEquity,
+      current_balance: initialEquity,
       status: 'active'
     };
 

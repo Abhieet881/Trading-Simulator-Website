@@ -72,7 +72,10 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { title, description, entry_fee, start_date, end_date, target_profit_percent } = body;
+    const { 
+      title, description, entry_fee, start_date, end_date, target_profit_percent,
+      prize_pool, max_participants, initial_equity, status, banner_image_url, banner_video_url
+    } = body;
 
     if (!title || !start_date || !end_date || target_profit_percent === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -85,7 +88,12 @@ export async function POST(request) {
       start_date,
       end_date,
       target_profit_percent: parseFloat(target_profit_percent),
-      status: 'upcoming'
+      prize_pool: parseFloat(prize_pool || 0),
+      max_participants: parseInt(max_participants || 1000),
+      initial_equity: parseFloat(initial_equity || 10000),
+      status: status || 'upcoming',
+      banner_image_url: banner_image_url || null,
+      banner_video_url: banner_video_url || null
     };
 
     let insertedData = null;
@@ -138,7 +146,10 @@ export async function PUT(request) {
     }
 
     const body = await request.json();
-    const { id, title, description, entry_fee, start_date, end_date, target_profit_percent, status } = body;
+    const { 
+      id, title, description, entry_fee, start_date, end_date, target_profit_percent, 
+      status, prize_pool, max_participants, initial_equity, banner_image_url, banner_video_url
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing competition id' }, { status: 400 });
@@ -152,6 +163,11 @@ export async function PUT(request) {
     if (end_date !== undefined) updates.end_date = end_date;
     if (target_profit_percent !== undefined) updates.target_profit_percent = parseFloat(target_profit_percent);
     if (status !== undefined) updates.status = status;
+    if (prize_pool !== undefined) updates.prize_pool = parseFloat(prize_pool);
+    if (max_participants !== undefined) updates.max_participants = parseInt(max_participants);
+    if (initial_equity !== undefined) updates.initial_equity = parseFloat(initial_equity);
+    if (banner_image_url !== undefined) updates.banner_image_url = banner_image_url;
+    if (banner_video_url !== undefined) updates.banner_video_url = banner_video_url;
 
     let updatedData = null;
     let updateError = null;

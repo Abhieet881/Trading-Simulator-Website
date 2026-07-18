@@ -118,9 +118,17 @@ function generateMockCandles(basePrice, timeframe = '1H', count = 45) {
   if (timeframe === '4H') interval = 14400;
   if (timeframe === '1D') interval = 86400;
 
-  let startTime = nowSec - (count * interval);
+  // Limit count for mock data to prevent huge fake history range (e.g. 2018 to 2027)
+  let limitCount = count;
+  if (timeframe === '1m') limitCount = Math.min(count, 60);       // 1 hour range
+  else if (timeframe === '15m') limitCount = Math.min(count, 96); // 24 hours range
+  else if (timeframe === '1H') limitCount = Math.min(count, 168);  // 7 days range
+  else if (timeframe === '4H') limitCount = Math.min(count, 120);  // 20 days range
+  else if (timeframe === '1D') limitCount = Math.min(count, 30);   // 30 days range
 
-  for (let i = 0; i < count; i++) {
+  let startTime = nowSec - (limitCount * interval);
+
+  for (let i = 0; i < limitCount; i++) {
     const trend = (Math.random() - 0.46) * 0.009;
     const open = current;
     const close = current * (1 + trend);

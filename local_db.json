@@ -111,11 +111,29 @@
       "opened_at": "2026-07-12T04:33:19.911Z",
       "created_at": "2026-07-12T04:33:19.911Z",
       "closed_at": "2026-07-12T04:33:39.893Z"
+    },
+    {
+      "id": "j5n17gp022rkzjly8z99fl",
+      "user_id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "symbol": "BTC",
+      "side": "buy",
+      "status": "open",
+      "entry_price": 63974.56,
+      "exit_price": null,
+      "quantity": 0.1,
+      "size": 0.1,
+      "usd_amount": 639.7456,
+      "pnl": 0,
+      "opened_at": "2026-07-18T09:12:43.915Z",
+      "created_at": "2026-07-18T09:12:43.915Z",
+      "closed_at": null,
+      "take_profit": null,
+      "stop_loss": null
     }
   ],
   "wallets": {
-    "44b923fa-af8b-4e70-98a2-ab748c31b49c": 9988.31,
-    "d6f2e105-ab15-4069-b654-e6ee47f43b32": 1000
+    "44b923fa-af8b-4e70-98a2-ab748c31b49c": 10000,
+    "d6f2e105-ab15-4069-b654-e6ee47f43b32": 310.25
   },
   "competitions": [
     {
@@ -127,14 +145,44 @@
       "end_date": "2026-07-20T11:03:55.130Z",
       "target_profit_percent": 15,
       "status": "active",
+      "prize_pool": 5000,
+      "max_participants": 250,
+      "initial_equity": 10000,
+      "banner_image_url": "/uploads/demo_banner.jpg",
       "created_at": "2026-07-15T11:03:55.130Z"
+    },
+    {
+      "id": "1xk8vc4",
+      "title": "xyz",
+      "description": "ne testing",
+      "entry_fee": 10,
+      "start_date": "2026-07-18T06:59:00.000Z",
+      "end_date": "2026-08-18T06:59:00.000Z",
+      "target_profit_percent": 10,
+      "prize_pool": 500,
+      "max_participants": 1000,
+      "initial_equity": 10000,
+      "status": "upcoming",
+      "created_at": "2026-07-18T06:59:47.995Z"
     }
   ],
-  "competition_participants": [],
+  "competition_participants": [
+    {
+      "competition_id": "comp-mock-123456",
+      "user_id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "starting_balance": 950,
+      "current_balance": 310.25,
+      "status": "active",
+      "id": "zxjcq6jjnk",
+      "joined_at": "2026-07-18T06:46:03.416Z"
+    }
+  ],
   "wallets_configured": {
-    "d6f2e105-ab15-4069-b654-e6ee47f43b32": true
+    "d6f2e105-ab15-4069-b654-e6ee47f43b32": true,
+    "44b923fa-af8b-4e70-98a2-ab748c31b49c": true
   },
   "initial_balances": {
-    "d6f2e105-ab15-4069-b654-e6ee47f43b32": 1000
+    "d6f2e105-ab15-4069-b654-e6ee47f43b32": 1000,
+    "44b923fa-af8b-4e70-98a2-ab748c31b49c": 10000
   }
 }

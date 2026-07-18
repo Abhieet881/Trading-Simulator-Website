@@ -8,7 +8,7 @@ import {
   Filter, Tag, Briefcase, Percent, DollarSign,
   Trophy, History, Loader2
 } from 'lucide-react';
-import UserDropdown from '../dashboard/UserDropdown';
+import Navbar from '@/components/Navbar';
 
 export default function HistoryClientPage({ userName, trades = [] }) {
   const [assetFilter, setAssetFilter] = useState('All');
@@ -106,42 +106,7 @@ export default function HistoryClientPage({ userName, trades = [] }) {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-between font-sans text-gray-800">
-      {/* Top Navbar */}
-      <header className="border-b border-[#E5E7EB] bg-white sticky top-0 z-50 shadow-sm select-none">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <TrendingUp className="text-white w-4.5 h-4.5" />
-            </div>
-            <span className="font-bold text-lg tracking-tight text-[#111111]">PaperPulse</span>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/dashboard" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/trade" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Trade
-            </Link>
-            <Link href="/history" className="text-sm font-semibold text-[#2563EB] transition-colors">
-              History
-            </Link>
-            <Link href="/leaderboard" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Leaderboard
-            </Link>
-            <Link href="/competitions" className="text-sm font-semibold text-[#6B7280] hover:text-[#111111] transition-colors">
-              Competitions
-            </Link>
-          </nav>
-
-          {/* User Profile dropdown */}
-          <div className="flex items-center gap-4">
-            <UserDropdown userName={userName} />
-          </div>
-        </div>
-      </header>
+      <Navbar userName={userName} />
 
       {/* Main Section */}
       <main className="max-w-6xl mx-auto px-6 py-10 flex-grow w-full">
