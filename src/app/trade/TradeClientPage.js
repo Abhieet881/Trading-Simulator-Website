@@ -188,6 +188,20 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
 
+  // Account Details Dropdown state and click outside handler
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const accountDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target)) {
+        setIsAccountDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Drawing toolbar states
   const [activeDrawingTool, setActiveDrawingTool] = useState('cursor'); // cursor, trend, fib, brush, text
   const [drawingsLocked, setDrawingsLocked] = useState(false);
@@ -1149,9 +1163,18 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
         {/* SUBMIT BUTTON & FOOTER STATS (Pinned at bottom) */}
         <div className="p-3 pt-2 border-t border-gray-100 select-none font-bold bg-[#FAFAFA] shrink-0">
           {/* Available Balance */}
-          <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-2 select-none">
+          <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1 select-none">
             <span>Available Balance</span>
             <span className="text-gray-900 font-mono font-bold">{parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+          </div>
+
+          {/* Active Account Indicator */}
+          <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 mb-2.5 pb-2 border-b border-gray-100 select-none">
+            <span>Trading Account</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-900 font-mono font-bold">Demo #{accountNumber}</span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-green-50 text-green-700 border border-green-200 select-none tracking-wider">Active</span>
+            </div>
           </div>
 
           <button
@@ -1388,12 +1411,43 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
 
           <div className="flex items-center gap-3">
             {/* Account Details Dropdown */}
-            <div 
-              onClick={() => showToast('Demo accounts are preset for simulations.', 'info')}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-md text-[10px] text-gray-600 font-bold hover:bg-gray-100 cursor-pointer select-none"
-            >
-              <span>Demo Account #{accountNumber}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            <div className="relative" ref={accountDropdownRef}>
+              <button 
+                onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-md text-[10px] text-gray-600 font-bold hover:bg-gray-100 cursor-pointer select-none"
+              >
+                <span>Demo Account #{accountNumber}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isAccountDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isAccountDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-200 select-none">
+                  <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Trading Account</span>
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                      <span className="text-[9px] font-bold text-green-600 uppercase tracking-wider">Active</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 font-semibold">Account Type</span>
+                      <span className="text-gray-900 font-bold">Demo Account</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 font-semibold">Account ID</span>
+                      <span className="text-gray-900 font-mono font-semibold">#{accountNumber}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 font-semibold">Current Balance</span>
+                      <span className="text-gray-900 font-bold font-mono text-[#10B981]">
+                        ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button 
@@ -2242,9 +2296,18 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                 {/* Submit button and balance details */}
                 <div className="mt-3.5 pt-3.5 border-t border-gray-100 select-none">
                   {/* Available Balance */}
-                  <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-2.5 select-none">
+                  <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1 select-none">
                     <span>Available Balance</span>
                     <span className="text-gray-900 font-mono font-bold">{balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+                  </div>
+
+                  {/* Active Account Indicator */}
+                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 mb-2.5 pb-2 border-b border-gray-100 select-none">
+                    <span>Trading Account</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-gray-900 font-mono font-bold">Demo #{accountNumber}</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-green-50 text-green-700 border border-green-200 select-none tracking-wider">Active</span>
+                    </div>
                   </div>
 
                   <button

@@ -8,6 +8,7 @@ import {
   HelpCircle, Eye, EyeOff, Info, ArrowRight, Loader2
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { getAccountNumber } from '@/lib/account';
 
 export default function SettingsClientPage({
   userId,
@@ -206,6 +207,13 @@ export default function SettingsClientPage({
               <Award className="w-4 h-4 text-[#2563EB]" /> Account & Plan
             </h2>
             <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Account Number</span>
+                <span className="text-sm font-mono font-bold text-gray-900">
+                  Demo #{getAccountNumber(userId)}
+                </span>
+              </div>
+
               <div className="flex justify-between items-center py-2 border-b border-gray-50">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Current Plan</span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-[#2563EB] border border-blue-100 select-none">
