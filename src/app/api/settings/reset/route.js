@@ -22,7 +22,7 @@ export async function POST(request) {
     try {
       const { data: dbWallet, error: fetchError } = await supabase
         .from('wallets')
-        .select('initial_balance')
+        .select('balance_configured, initial_balance')
         .eq('user_id', user.id)
         .single();
       

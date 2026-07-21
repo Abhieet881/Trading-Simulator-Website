@@ -45,7 +45,7 @@ export default async function SettingsPage() {
   try {
     const { data: dbWallet, error: dbWalletError } = await supabase
       .from('wallets')
-      .select('virtual_balance, initial_balance')
+      .select('virtual_balance, balance_configured, initial_balance')
       .eq('user_id', user.id)
       .single();
 

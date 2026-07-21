@@ -22,12 +22,12 @@ export async function GET() {
     try {
       const { data: dbWallet, error: dbWalletError } = await supabase
         .from('wallets')
-        .select('virtual_balance')
+        .select('virtual_balance, balance_configured')
         .eq('user_id', user.id)
         .single();
 
       if (dbWalletError) {
-        if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist')) {
+        if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
           const localDbPath = path.join(process.cwd(), 'local_db.json');
           if (fs.existsSync(localDbPath)) {
             const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));

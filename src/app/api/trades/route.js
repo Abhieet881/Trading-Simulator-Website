@@ -265,7 +265,7 @@ export async function POST(request) {
       .single();
 
     if (walletError) {
-      if (walletError.message?.includes('schema cache') || walletError.message?.includes('does not exist')) {
+      if (walletError.message?.includes('schema cache') || walletError.message?.includes('does not exist') || walletError.message?.includes('column')) {
         return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
       }
       throw walletError;
