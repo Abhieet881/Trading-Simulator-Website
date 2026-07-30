@@ -4,14 +4,23 @@ import React, { useState } from 'react';
 import { Wallet, Sparkles, CheckCircle } from 'lucide-react';
 
 export default function OnboardingBalanceSelector({ onBalanceSet }) {
-  const presets = [1000, 5000, 10000, 25000, 50000, 100000];
+  const presets = [
+    { value: 1000, label: '$1,000' },
+    { value: 5000, label: '$5,000' },
+    { value: 10000, label: '$10,000' },
+    { value: 25000, label: '$25,000' },
+    { value: 50000, label: '$50,000' },
+    { value: 100000, label: '$100,000' }
+  ];
   const [selectedPreset, setSelectedPreset] = useState(10000);
   const [customAmount, setCustomAmount] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Confirm starting balance clicked!');
     setError('');
     
     let amount = selectedPreset;
@@ -24,14 +33,16 @@ export default function OnboardingBalanceSelector({ onBalanceSet }) {
       amount = parsed;
     }
 
+    console.log('API onboard request payload:', { amount, name: accountName });
     setLoading(true);
     try {
       const res = await fetch('/api/wallets/onboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, name: accountName }),
       });
       const data = await res.json();
+      console.log('API onboard request response:', { ok: res.ok, status: res.status, data });
 
       if (res.ok && data.success) {
         if (onBalanceSet) {
@@ -74,18 +85,31 @@ export default function OnboardingBalanceSelector({ onBalanceSet }) {
           </div>
         )}
 
+        {/* Account Name */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Account Name (Optional)</label>
+          <input
+            type="text"
+            maxLength="30"
+            placeholder="e.g. Gold Strategy Test, Main Demo"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors"
+          />
+        </div>
+
         {/* Preset Selectors */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Presets</label>
           <div className="grid grid-cols-3 gap-3">
             {presets.map((preset) => {
-              const isSelected = selectedPreset === preset && !customAmount;
+              const isSelected = selectedPreset === preset.value && !customAmount;
               return (
                 <button
-                  key={preset}
+                  key={preset.value}
                   type="button"
                   onClick={() => {
-                    setSelectedPreset(preset);
+                    setSelectedPreset(preset.value);
                     setCustomAmount('');
                     setError('');
                   }}
@@ -95,7 +119,7 @@ export default function OnboardingBalanceSelector({ onBalanceSet }) {
                       : 'border-gray-200 hover:border-gray-300 text-gray-700 bg-white'
                   }`}
                 >
-                  ${preset.toLocaleString()}
+                  {preset.label}
                 </button>
               );
             })}

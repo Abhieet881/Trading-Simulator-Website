@@ -292,5 +292,49 @@
   "initial_balances": {
     "d6f2e105-ab15-4069-b654-e6ee47f43b32": 1000,
     "44b923fa-af8b-4e70-98a2-ab748c31b49c": 10000
-  }
+  },
+  "wallets_multi": [
+    {
+      "id": "u96pntj78x42ue1yeyssb",
+      "user_id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "account_number": "776354",
+      "account_name": null,
+      "virtual_balance": 1000,
+      "currency": "USD",
+      "initial_balance": 1000,
+      "balance_configured": true,
+      "updated_at": "2026-07-30T18:07:35.831Z"
+    },
+    {
+      "id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "user_id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "account_number": "910502",
+      "account_name": "Primary Demo",
+      "virtual_balance": 869.85,
+      "initial_balance": 1000,
+      "balance_configured": true,
+      "updated_at": "2026-07-30T18:18:47.289Z"
+    },
+    {
+      "id": "a9a531a0-05a3-4b4a-959a-7deb7c8fd3b9",
+      "user_id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "account_number": "715555",
+      "virtual_balance": 1000,
+      "initial_balance": 1000,
+      "balance_configured": true,
+      "updated_at": "2026-07-30T18:38:43.317Z",
+      "account_name": "goldy"
+    },
+    {
+      "id": "kkpde5dx1gbnat4ccvv88",
+      "user_id": "d6f2e105-ab15-4069-b654-e6ee47f43b32",
+      "account_number": "206977",
+      "account_name": null,
+      "virtual_balance": 5000,
+      "currency": "USD",
+      "initial_balance": 5000,
+      "balance_configured": true,
+      "updated_at": "2026-07-30T18:38:17.191Z"
+    }
+  ]
 }

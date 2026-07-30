@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   TrendingUp, User, Wallet, Award, Settings, 
   Lock, AlertTriangle, ShieldAlert, CheckCircle2, 
-  HelpCircle, Eye, EyeOff, Info, ArrowRight, Loader2
+  HelpCircle, Eye, EyeOff, Info, ArrowRight, Loader2, Pencil
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { getAccountNumber } from '@/lib/account';
@@ -17,7 +17,10 @@ export default function SettingsClientPage({
   initialCreatedAt,
   initialPlanType,
   initialBalance,
-  initialConfiguredBalance = 10000.00
+  initialConfiguredBalance = 10000.00,
+  accountNumber,
+  accountName,
+  initialWallets = []
 }) {
   const [name, setName] = useState(initialName);
   const [balance, setBalance] = useState(initialBalance);
@@ -33,6 +36,76 @@ export default function SettingsClientPage({
   // Modal states
   const [showResetModal, setShowResetModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Multiple accounts state
+  const [wallets, setWallets] = useState(initialWallets);
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [renamingWalletId, setRenamingWalletId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState('');
+  const [renaming, setRenaming] = useState(false);
+
+  // Switch and rename handlers
+  const handleSwitchAccount = async (walletId) => {
+    try {
+      const res = await fetch('/api/user/account/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId })
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        showToast('Failed to switch account.', 'info');
+      }
+    } catch (err) {
+      console.error('Error switching account:', err);
+      showToast('Failed to switch account.', 'info');
+    }
+  };
+
+  const handleRenameClick = (walletId, currentName) => {
+    setRenamingWalletId(walletId);
+    setRenameValue(currentName || '');
+    setRenameError('');
+    setIsRenameModalOpen(true);
+  };
+
+  const submitRenameAccount = async (e) => {
+    if (e) e.preventDefault();
+    setRenameError('');
+
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setRenameError('Account name cannot be empty.');
+      return;
+    }
+    if (trimmed.length > 30) {
+      setRenameError('Account name cannot exceed 30 characters.');
+      return;
+    }
+
+    setRenaming(true);
+    try {
+      const res = await fetch('/api/user/account/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId: renamingWalletId, name: trimmed })
+      });
+      if (res.ok) {
+        setIsRenameModalOpen(false);
+        window.location.reload();
+      } else {
+        const data = await res.json();
+        setRenameError(data.error || 'Failed to rename account.');
+      }
+    } catch (err) {
+      console.error('Error renaming account:', err);
+      setRenameError('Failed to rename account due to a network error.');
+    } finally {
+      setRenaming(false);
+    }
+  };
 
   // Toast notifications
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
@@ -208,9 +281,9 @@ export default function SettingsClientPage({
             </h2>
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Account Number</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Account Details</span>
                 <span className="text-sm font-mono font-bold text-gray-900">
-                  Demo #{getAccountNumber(userId)}
+                  {accountName ? `${accountName} — ` : ''}Demo #{accountNumber}
                 </span>
               </div>
 
@@ -237,6 +310,76 @@ export default function SettingsClientPage({
                   Upgrade to Premium
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* MY ACCOUNTS SECTION CARD */}
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+              <h2 className="text-sm font-bold text-[#111111] uppercase tracking-wider flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-[#2563EB]" /> My Practice Accounts
+              </h2>
+              <span className="text-xs font-semibold text-gray-500">
+                {wallets.length} / {initialPlanType === 'free' ? 2 : 5}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {wallets.map((w) => {
+                const isCurrentActive = w.account_number === accountNumber;
+
+                return (
+                  <div 
+                    key={w.id}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all ${
+                      isCurrentActive 
+                        ? 'border-[#2563EB]/30 bg-[#2563EB]/5 text-[#111111]' 
+                        : 'border-gray-100 hover:border-gray-200 text-gray-700 bg-white'
+                    }`}
+                  >
+                    <div className="flex flex-col mb-3 sm:mb-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-gray-900">
+                          {w.account_name || 'Primary Demo'}
+                        </span>
+                        {isCurrentActive && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20 select-none">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-semibold text-gray-400 font-mono mt-0.5">
+                        Demo #{w.account_number}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                      <span className="text-sm font-mono font-bold text-gray-900">
+                        ${parseFloat(w.virtual_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                      
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRenameClick(w.id, w.account_name)}
+                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-all cursor-pointer border border-transparent hover:border-gray-200"
+                          title="Rename Account"
+                        >
+                          <Pencil className="w-3.5 h-3.5 pointer-events-none" />
+                        </button>
+                        
+                        {!isCurrentActive && (
+                          <button
+                            onClick={() => handleSwitchAccount(w.id)}
+                            className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs rounded-lg transition-all cursor-pointer shadow-sm select-none"
+                          >
+                            Switch
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -389,6 +532,47 @@ export default function SettingsClientPage({
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal for renaming an account */}
+      {isRenameModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[300] p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 max-w-sm w-full shadow-2xl select-none animate-in zoom-in-95 duration-200">
+            <h3 className="text-sm font-bold text-gray-900 mb-3">Rename Account</h3>
+            <form onSubmit={submitRenameAccount} className="space-y-4">
+              {renameError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs font-semibold flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4" />
+                  {renameError}
+                </div>
+              )}
+              <input
+                type="text"
+                maxLength="30"
+                placeholder="e.g. Gold Strategy Test"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors"
+                autoFocus
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsRenameModalOpen(false)}
+                  className="px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={renaming}
+                  className="px-4 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] text-white rounded-lg text-xs font-bold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {renaming ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

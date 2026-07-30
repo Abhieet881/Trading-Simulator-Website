@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase';
-import { getAccountNumber } from '@/lib/account';
-import fs from 'fs';
-import path from 'path';
+import { getActiveWallet } from '@/lib/activeWallet';
 
 export async function GET() {
   try {
@@ -14,47 +12,51 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Generate deterministic account number
-    const accountNumber = getAccountNumber(user.id);
-
-    // 3. Fetch user wallet balance
-    let balance = 10000.00;
+    // 2. Resolve plan type
+    let planType = 'free';
     try {
-      const { data: dbWallet, error: dbWalletError } = await supabase
-        .from('wallets')
-        .select('virtual_balance, balance_configured')
-        .eq('user_id', user.id)
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('plan_type')
+        .eq('id', user.id)
         .single();
-
-      if (dbWalletError) {
-        if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
-          const localDbPath = path.join(process.cwd(), 'local_db.json');
-          if (fs.existsSync(localDbPath)) {
-            const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-            balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 10000.00;
-          }
-        } else {
-          throw dbWalletError;
-        }
-      } else if (dbWallet) {
-        balance = parseFloat(dbWallet.virtual_balance || 0);
+      if (dbUser && dbUser.plan_type) {
+        planType = dbUser.plan_type.toLowerCase();
       }
-    } catch (err) {
-      console.warn('Failed to fetch wallet from Supabase, attempting local db fallback:', err.message);
-      const localDbPath = path.join(process.cwd(), 'local_db.json');
-      if (fs.existsSync(localDbPath)) {
-        try {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 10000.00;
-        } catch (e) {
-          console.error('Local DB fallback error:', e);
-        }
-      }
+    } catch (e) {
+      // ignore
     }
 
+    const maxLimit = planType === 'premium' ? 5 : 2;
+
+    // 3. Resolve active wallet and list of wallets
+    const { activeWallet, wallets } = await getActiveWallet(user.id);
+
+    const formattedAccounts = wallets.map(w => ({
+      id: w.id,
+      accountNumber: w.account_number,
+      accountName: w.account_name || null,
+      balance: parseFloat(w.virtual_balance || 0),
+      initialBalance: parseFloat(w.initial_balance || 0),
+      isConfigured: w.balance_configured,
+      isActive: w.id === activeWallet.id
+    }));
+
     return NextResponse.json({
-      accountNumber,
-      balance
+      accountNumber: activeWallet.account_number,
+      accountName: activeWallet.account_name || null,
+      balance: parseFloat(activeWallet.virtual_balance || 0),
+      activeAccount: {
+        id: activeWallet.id,
+        accountNumber: activeWallet.account_number,
+        accountName: activeWallet.account_name || null,
+        balance: parseFloat(activeWallet.virtual_balance || 0),
+        initialBalance: parseFloat(activeWallet.initial_balance || 0),
+        isConfigured: activeWallet.balance_configured
+      },
+      accounts: formattedAccounts,
+      limitReached: wallets.length >= maxLimit,
+      maxLimit
     });
 
   } catch (error) {

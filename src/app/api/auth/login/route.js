@@ -51,8 +51,8 @@ export async function POST(req) {
         status: 'active'
       });
       // Re-create wallet as well if missing
-      const { data: walletCheck } = await supabase.from('wallets').select('id').eq('user_id', authUser.id).single();
-      if (!walletCheck) {
+      const { data: walletsCheck } = await supabase.from('wallets').select('id').eq('user_id', authUser.id).limit(1);
+      if (!walletsCheck || walletsCheck.length === 0) {
         await supabase.from('wallets').insert({
           user_id: authUser.id,
           virtual_balance: 0.00,

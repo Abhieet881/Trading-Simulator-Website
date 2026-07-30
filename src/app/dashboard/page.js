@@ -6,6 +6,7 @@ import {
   ArrowRight 
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { getActiveWallet } from '@/lib/activeWallet';
 import Navbar from '@/components/Navbar';
 import OnboardingBalanceSelector from './OnboardingBalanceSelector';
 
@@ -39,53 +40,13 @@ export default async function DashboardPage() {
   const displayEmail = dbUser?.email || user.email;
   const planType = dbUser?.plan_type || 'free';
 
-  // 3. Resolve wallet balance from public.wallets table
-  let balance = 0.00;
-  let balanceConfigured = false;
-  let initialBalance = 0.00;
-  let useLocalFallback = false;
-  try {
-    const { data: dbWallet, error: dbWalletError } = await supabase
-      .from('wallets')
-      .select('virtual_balance, balance_configured, initial_balance')
-      .eq('user_id', user.id)
-      .single();
+  // 3. Resolve active wallet details
+  const { activeWallet, useLocalFallback } = await getActiveWallet(user.id);
+  const balance = parseFloat(activeWallet.virtual_balance || 0);
+  const balanceConfigured = activeWallet.balance_configured || false;
+  const initialBalance = parseFloat(activeWallet.initial_balance || 0);
 
-    if (dbWalletError || !dbWallet) {
-      useLocalFallback = true;
-      const fs = require('fs');
-      const path = require('path');
-      const localDbPath = path.join(process.cwd(), 'local_db.json');
-      if (fs.existsSync(localDbPath)) {
-        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
-        initialBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 0.00;
-      }
-    } else {
-      balance = parseFloat(dbWallet.virtual_balance || 0);
-      balanceConfigured = dbWallet.balance_configured || false;
-      initialBalance = parseFloat(dbWallet.initial_balance || 0);
-    }
-  } catch (err) {
-    console.error('Failed to fetch wallet for dashboard, using fallback:', err);
-    useLocalFallback = true;
-    const fs = require('fs');
-    const path = require('path');
-    const localDbPath = path.join(process.cwd(), 'local_db.json');
-    if (fs.existsSync(localDbPath)) {
-      try {
-        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
-        initialBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 0.00;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
-
-  // 4. Fetch trades (with fallback support)
+  // 4. Fetch trades (with fallback support) scoped by active wallet
   let openPositionsCount = 0;
   let totalClosedPnL = 0.00;
   let hasTrades = false;
@@ -98,7 +59,10 @@ export default async function DashboardPage() {
     if (fs.existsSync(localDbPath)) {
       try {
         const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        const localTrades = db.trades.filter(t => t.user_id === user.id);
+        const localTrades = db.trades.filter(t => 
+          t.user_id === user.id && 
+          (t.wallet_id === activeWallet.id || (!t.wallet_id && activeWallet.id === user.id))
+        );
         
         if (localTrades.length > 0) {
           hasTrades = true;
@@ -115,11 +79,29 @@ export default async function DashboardPage() {
     }
   } else {
     try {
-      const { data: dbTrades, error: dbTradesError } = await supabase
+      let query = supabase
         .from('trades')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      
+      if (activeWallet.id === user.id) {
+        query = query.or(`wallet_id.eq.${activeWallet.id},wallet_id.is.null`);
+      } else {
+        query = query.eq('wallet_id', activeWallet.id);
+      }
+
+      let { data: dbTrades, error: dbTradesError } = await query.order('created_at', { ascending: false });
+
+      // Fallback if wallet_id column doesn't exist in trades table yet
+      if (dbTradesError && (dbTradesError.message?.includes('column') || dbTradesError.message?.includes('wallet_id'))) {
+        const fallbackRes = await supabase
+          .from('trades')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        dbTrades = fallbackRes.data;
+        dbTradesError = fallbackRes.error;
+      }
 
       if (dbTradesError) {
         throw dbTradesError;
@@ -168,88 +150,87 @@ export default async function DashboardPage() {
             <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Virtual Balance</span>
               <div className="p-2 bg-[#2563EB]/10 rounded-lg text-[#2563EB]">
-                <Wallet className="w-5 h-5" />
+                <Wallet className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#111111] font-mono">
-              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <h3 className="text-2xl font-bold text-[#111111] tracking-tight font-mono">
+              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </h3>
+            <p className="text-[10px] font-semibold text-[#6B7280] mt-1">
+              Currency: USD
             </p>
-            <span className="text-xs text-[#16A34A] font-semibold flex items-center gap-1 mt-1">
-              Ready to trade
-            </span>
           </div>
 
-          {/* Total P&L */}
+          {/* Active Positions */}
           <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
             <div className="flex justify-between items-center mb-4">
-              <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Total P&L</span>
-              <div className={`p-2 rounded-lg ${pnlIsPositive ? 'bg-[#16A34A]/10 text-[#16A34A]' : pnlIsNegative ? 'bg-[#DC2626]/10 text-[#DC2626]' : 'bg-gray-100 text-gray-400'}`}>
-                <TrendingUp className="w-5 h-5" />
+              <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Active Trades</span>
+              <div className="p-2 bg-[#10B981]/10 rounded-lg text-[#10B981]">
+                <TrendingUp className="w-4 h-4" />
               </div>
             </div>
-            <p className={`text-2xl font-bold font-mono ${pnlIsPositive ? 'text-[#16A34A]' : pnlIsNegative ? 'text-[#DC2626]' : 'text-gray-400'}`}>
-              {pnlIsPositive ? '+' : ''}${totalClosedPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <h3 className="text-2xl font-bold text-[#111111] tracking-tight">
+              {openPositionsCount}
+            </h3>
+            <p className="text-[10px] font-semibold text-green-600 mt-1 flex items-center gap-0.5">
+              <span>●</span> Market active
             </p>
-            <span className={`text-xs font-semibold font-mono flex items-center gap-1 mt-1 ${pnlIsPositive ? 'text-[#16A34A]' : pnlIsNegative ? 'text-[#DC2626]' : 'text-gray-400'}`}>
-              {formatPercent(pnlPercent)}
-            </span>
           </div>
 
-          {/* Open Positions */}
+          {/* Closed PnL */}
           <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
             <div className="flex justify-between items-center mb-4">
-              <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Open Positions</span>
-              <div className={`p-2 rounded-lg ${openPositionsCount > 0 ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'bg-gray-100 text-gray-400'}`}>
-                <BarChart3 className="w-5 h-5" />
+              <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Total PnL (Closed)</span>
+              <div className={`p-2 rounded-lg ${pnlIsNegative ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                <BarChart3 className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#111111] font-mono">{openPositionsCount}</p>
-            <span className="text-xs text-gray-400 font-semibold flex items-center gap-1 mt-1">
-              {openPositionsCount > 0 ? `${openPositionsCount} active trades` : 'No active trades'}
-            </span>
+            <h3 className={`text-2xl font-bold tracking-tight font-mono ${
+              pnlIsPositive ? 'text-green-600' : pnlIsNegative ? 'text-red-600' : 'text-gray-500'
+            }`}>
+              {pnlIsPositive ? '+' : ''}${totalClosedPnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </h3>
+            <p className={`text-[10px] font-bold mt-1 ${
+              pnlIsPositive ? 'text-green-600' : pnlIsNegative ? 'text-red-600' : 'text-gray-500'
+            }`}>
+              {formatPercent(pnlPercent)} of balance
+            </p>
           </div>
 
-          {/* Plan Type */}
+          {/* Account Plan Status */}
           <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 transition-all">
             <div className="flex justify-between items-center mb-4">
-              <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Plan Type</span>
-              <div className="p-2 bg-[#2563EB]/10 rounded-lg text-[#2563EB]">
-                <Award className="w-5 h-5" />
+              <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">Practice Plan</span>
+              <div className="p-2 bg-[#F59E0B]/10 rounded-lg text-[#F59E0B]">
+                <Award className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#111111] capitalize">
-              {planType} User
+            <h3 className="text-2xl font-extrabold text-[#111111] tracking-tight uppercase">
+              {planType}
+            </h3>
+            <p className="text-[10px] font-semibold text-[#6B7280] mt-1">
+              {planType === 'free' ? 'Upgrade for higher limits' : 'Unrestricted practice limits'}
             </p>
-            <span className="text-xs text-[#2563EB] font-semibold flex items-center gap-1 mt-1">
-              Active
-            </span>
           </div>
         </div>
 
-        {/* Conditional Body: Onboarding Balance Selector, Empty State, or Activity List */}
-        {!balanceConfigured ? (
-          <OnboardingBalanceSelector />
-        ) : !hasTrades ? (
-          /* Empty State Section */
-          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-10 md:p-16 text-center max-w-2xl mx-auto shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-12">
-            <div className="w-16 h-16 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-6 text-[#2563EB]">
-              <BarChart3 className="w-8 h-8" />
+        {!hasTrades ? (
+          /* Empty State if no trades exist yet */
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-12 text-center max-w-xl mx-auto shadow-[0_2px_8px_rgba(0,0,0,0.02)] mb-8 select-none animate-fade-in">
+            <div className="w-16 h-16 bg-[#2563EB]/5 rounded-full flex items-center justify-center text-[#2563EB] mx-auto mb-5 shadow-sm border border-[#2563EB]/10">
+              <TrendingUp className="w-7 h-7" />
             </div>
-            <h2 className="text-2xl font-bold text-[#111111] tracking-tight">
-              Start Your First Trade
-            </h2>
-            <p className="text-base text-[#6B7280] mt-3 max-w-md mx-auto leading-relaxed">
-              You have ${balance.toLocaleString('en-US')} in virtual funds ready to trade. Explore crypto, forex, and stocks with zero risk.
+            <h2 className="text-xl font-bold text-gray-900 mb-2">No Trades Recorded Yet</h2>
+            <p className="text-sm font-semibold text-gray-500 max-w-sm mx-auto mb-6 leading-relaxed">
+              Open the Trade Terminal to start practicing trading. Execute orders on live simulated crypto, stock, or forex rates.
             </p>
-            <div className="mt-8">
-              <Link 
-                href="/trade" 
-                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-[#2563EB] hover:bg-[#1d4ed8] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all cursor-pointer group"
-              >
-                <span>Go to Trading</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
+            <Link
+              href="/trade"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-bold text-sm rounded-xl shadow-[0_2px_4px_rgba(37,99,235,0.1)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.2)] transition-all group"
+            >
+              Start Trading Now
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
           </div>
         ) : (
           /* Recent Activity Section */
@@ -260,6 +241,7 @@ export default async function DashboardPage() {
                 New Trade
               </Link>
             </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs font-sans min-w-[650px] md:min-w-0">
                 <thead>
@@ -292,21 +274,23 @@ export default async function DashboardPage() {
                             {t.side?.charAt(0).toUpperCase() + t.side?.slice(1)}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-mono tabular-nums text-right">{parseFloat(t.quantity || t.size || 0).toFixed(2)}</td>
+                        <td className="py-3 px-3 font-mono tabular-nums text-right">
+                          {(parseFloat(t.quantity) || parseFloat(t.size) || 0).toFixed(2)}
+                        </td>
                         <td className="py-3 px-3 font-mono tabular-nums text-right">
                           ${parseFloat(t.entry_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="py-3 px-3">
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                            isClosed ? 'bg-gray-100 text-gray-500' : 'bg-[#2563EB]/10 text-[#2563EB]'
+                            isClosed ? 'bg-gray-100 text-gray-600 border border-gray-200' : 'bg-green-50 text-green-600 border border-green-200'
                           }`}>
                             {t.status}
                           </span>
                         </td>
-                        <td className={`py-3 px-3 text-right font-mono font-bold tabular-nums ${
-                          !isClosed ? 'text-gray-400' : isUp ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                        <td className={`py-3 px-3 font-mono tabular-nums text-right font-bold ${
+                          !isClosed ? 'text-gray-500' : isUp ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          {isClosed ? (isUp ? '+' : '') + tradePnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                          {!isClosed ? '--' : `${isUp ? '+' : ''}${tradePnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                         </td>
                       </tr>
                     );
@@ -314,121 +298,28 @@ export default async function DashboardPage() {
                 </tbody>
               </table>
             </div>
-            {/* View Full History link */}
-            <div className="mt-4 pt-4 border-t border-[#E5E7EB] flex justify-center select-none">
-              <Link 
-                href="/history" 
-                className="text-xs font-bold text-[#2563EB] hover:text-[#1d4ed8] flex items-center gap-1 group"
-              >
-                <span>View Full Trading History</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
           </div>
         )}
 
-
-        {/* Market Quick Preview */}
-        <div className="border-t border-[#E5E7EB] pt-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-[#111111] tracking-tight">Market Quick Preview</h3>
-            <Link href="/trade" className="text-xs font-semibold text-[#2563EB] hover:underline flex items-center gap-1">
-              View all assets <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+        {/* If balance is not configured, show onboarding modal overlay */}
+        {!balanceConfigured && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[45] flex items-center justify-center p-4">
+            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-2 max-w-xl w-full shadow-2xl animate-in scale-in duration-200">
+              <OnboardingBalanceSelector />
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {await (async () => {
-              // Server-side parallel fetch to display actual real-world prices
-              let btcVal = { price: 67240.50, change: 2.45, isUp: true };
-              let eurVal = { price: 1.0845, change: 0.12, isUp: true };
-              let gbpVal = { price: 1.2825, change: 0.18, isUp: true };
-              let xauVal = { price: 2380.50, change: 0.79, isUp: true };
-
-              try {
-                const [btcRes, forexRes] = await Promise.allSettled([
-                  fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT', { next: { revalidate: 15 } }).then(r => r.json()),
-                  fetch('https://open.er-api.com/v6/latest/USD', { next: { revalidate: 60 } }).then(r => r.json())
-                ]);
-
-                if (btcRes.status === 'fulfilled' && btcRes.value && !btcRes.value.code) {
-                  const val = btcRes.value;
-                  const price = parseFloat(val.lastPrice) || 67240.50;
-                  const change = parseFloat(val.priceChangePercent) || 2.45;
-                  btcVal = { price, change, isUp: change >= 0 };
-                }
-
-                if (forexRes.status === 'fulfilled' && forexRes.value && forexRes.value.rates) {
-                  const rates = forexRes.value.rates;
-                  
-                  // EUR/USD
-                  const eurRate = rates.EUR;
-                  if (eurRate) {
-                    const price = 1 / eurRate;
-                    eurVal = { price: parseFloat(price.toFixed(4)), change: 0.12, isUp: true };
-                  }
-
-                  // GBP/USD
-                  const gbpRate = rates.GBP;
-                  if (gbpRate) {
-                    const price = 1 / gbpRate;
-                    gbpVal = { price: parseFloat(price.toFixed(4)), change: 0.18, isUp: true };
-                  }
-
-                  // XAU/USD
-                  const xauRate = rates.XAU;
-                  if (xauRate) {
-                    const price = 1 / xauRate;
-                    xauVal = { price: parseFloat(price.toFixed(2)), change: 0.79, isUp: true };
-                  }
-                }
-              } catch (e) {
-                console.error("Dashboard server-side price fetch failed:", e);
-              }
-
-              const marketList = [
-                { symbol: 'BTC', name: 'Bitcoin', price: btcVal.price, change: btcVal.change, isUp: btcVal.isUp, type: 'Crypto' },
-                { symbol: 'EUR/USD', name: 'Euro / US Dollar', price: eurVal.price, change: eurVal.change, isUp: eurVal.isUp, type: 'Forex' },
-                { symbol: 'GBP/USD', name: 'British Pound / US Dollar', price: gbpVal.price, change: gbpVal.change, isUp: gbpVal.isUp, type: 'Forex' },
-                { symbol: 'XAU/USD', name: 'Gold / US Dollar', price: xauVal.price, change: xauVal.change, isUp: xauVal.isUp, type: 'Commodities' }
-              ];
-
-              return marketList.map((asset) => (
-                <Link 
-                  key={asset.symbol} 
-                  href={`/trade`}
-                  className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(37,99,235,0.08)] hover:-translate-y-0.5 hover:border-[#2563EB]/40 transition-all group cursor-pointer flex flex-col justify-between h-full"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-xs font-bold text-[#111111]">{asset.symbol}</span>
-                      <p className="text-[10px] text-[#6B7280]">{asset.name}</p>
-                    </div>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                      {asset.type}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-4 flex items-baseline justify-between">
-                    <span className="text-base font-bold text-[#111111] font-mono">
-                      {asset.symbol.includes('/') 
-                        ? asset.price.toFixed(4) 
-                        : `$${asset.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                      }
-                    </span>
-                    <span className={`text-xs font-bold font-mono flex items-center gap-0.5 ${asset.isUp ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                      {asset.isUp ? '▲' : '▼'} {asset.isUp ? '+' : ''}{asset.change.toFixed(2)}%
-                    </span>
-                  </div>
-                </Link>
-              ));
-            })()}
-          </div>
-        </div>
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="text-center text-xs text-[#9CA3AF] py-6 border-t border-[#E5E7EB] bg-white">
-        &copy; {new Date().getFullYear()} PaperPulse. All rights reserved.
+      <footer className="border-t border-gray-200/60 bg-white py-6">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-semibold text-gray-500">
+          <p>© {new Date().getFullYear()} PaperPulse. All rights reserved.</p>
+          <div className="flex gap-4">
+            <Link href="/terms" className="hover:text-gray-900 transition-colors">Terms of Service</Link>
+            <Link href="/privacy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );

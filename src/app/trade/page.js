@@ -1,6 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getActiveWallet } from '@/lib/activeWallet';
 import TradeClientPage from './TradeClientPage';
 
 export const metadata = {
@@ -27,52 +28,18 @@ export default async function TradePage() {
 
   const displayName = dbUser?.name || user.user_metadata?.name || 'Trader';
 
-  // 3. Fetch user wallet balance
-  let balance = 0.00;
-  let balanceConfigured = false;
-  let useLocalFallback = false;
-  try {
-    const { data: dbWallet, error: dbWalletError } = await supabase
-      .from('wallets')
-      .select('virtual_balance, balance_configured')
-      .eq('user_id', user.id)
-      .single();
-
-    if (dbWalletError || !dbWallet) {
-      useLocalFallback = true;
-      const fs = require('fs');
-      const path = require('path');
-      const localDbPath = path.join(process.cwd(), 'local_db.json');
-      if (fs.existsSync(localDbPath)) {
-        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
-      }
-    } else {
-      balance = parseFloat(dbWallet.virtual_balance || 0);
-      balanceConfigured = dbWallet.balance_configured || false;
-    }
-  } catch (err) {
-    console.error('Failed to fetch wallet from Supabase, using default:', err);
-    useLocalFallback = true;
-    const fs = require('fs');
-    const path = require('path');
-    const localDbPath = path.join(process.cwd(), 'local_db.json');
-    if (fs.existsSync(localDbPath)) {
-      try {
-        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
-      } catch (e) {}
-    }
-  }
+  // 3. Resolve active wallet details
+  const { activeWallet, useLocalFallback } = await getActiveWallet(user.id);
+  const balance = parseFloat(activeWallet.virtual_balance || 0);
+  const balanceConfigured = activeWallet.balance_configured || false;
+  const accountNumber = activeWallet.account_number;
 
   // Redirect to dashboard if starting balance is not set
   if (!balanceConfigured) {
     redirect('/dashboard');
   }
 
-  // 4. Fetch user's active positions (with fallback support)
+  // 4. Fetch user's active positions for this wallet (with fallback support)
   let positions = [];
   if (useLocalFallback) {
     const fs = require('fs');
@@ -81,56 +48,80 @@ export default async function TradePage() {
     if (fs.existsSync(localDbPath)) {
       try {
         const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        const localPositions = db.trades.filter(t => t.user_id === user.id && t.status === 'open');
-        positions = localPositions.map(pos => ({
-          id: pos.id,
-          symbol: pos.symbol,
-          side: pos.side,
-          entry: parseFloat(pos.entry_price),
-          size: parseFloat(pos.quantity),
-          usd_amount: parseFloat(pos.usd_amount || 0),
-          swap: 0.00,
-          time: new Date(pos.opened_at).toLocaleString(),
-          take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
-          stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
-        }));
-      } catch (e) {}
+        const localPositions = db.trades.filter(t => 
+          t.user_id === user.id && 
+          t.status === 'open' && 
+          (t.wallet_id === activeWallet.id || (!t.wallet_id && activeWallet.id === user.id))
+        );
+        positions = localPositions.map(pos => {
+          const parsedSize = parseFloat(pos.quantity) || parseFloat(pos.size) || 0;
+          return {
+            id: pos.id,
+            symbol: pos.symbol,
+            side: pos.side,
+            entry: parseFloat(pos.entry_price),
+            size: parsedSize,
+            usd_amount: parseFloat(pos.usd_amount || 0),
+            swap: 0.00,
+            time: new Date(pos.opened_at).toLocaleString(),
+            take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
+            stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
+          };
+        });
+      } catch (e) {
+        console.error('Error fetching local positions:', e);
+      }
     }
   } else {
     try {
-      const { data: dbPositions, error: dbPosError } = await supabase
+      let query = supabase
         .from('trades')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'open');
+      
+      if (activeWallet.id === user.id) {
+        query = query.or(`wallet_id.eq.${activeWallet.id},wallet_id.is.null`);
+      } else {
+        query = query.eq('wallet_id', activeWallet.id);
+      }
+
+      let { data: dbPositions, error: dbPosError } = await query;
+
+      // Fallback if wallet_id column doesn't exist in trades table yet
+      if (dbPosError && (dbPosError.message?.includes('column') || dbPosError.message?.includes('wallet_id'))) {
+        const fallbackRes = await supabase
+          .from('trades')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'open');
+        dbPositions = fallbackRes.data;
+        dbPosError = fallbackRes.error;
+      }
 
       if (dbPosError) {
         throw dbPosError;
       } else if (dbPositions) {
-        positions = dbPositions.map(pos => ({
-          id: pos.id,
-          symbol: pos.symbol,
-          side: pos.side,
-          entry: parseFloat(pos.entry_price),
-          size: parseFloat(pos.quantity || pos.size || 0),
-          usd_amount: parseFloat(pos.usd_amount || 0),
-          swap: 0.00,
-          time: new Date(pos.created_at).toLocaleString(),
-          take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
-          stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
-        }));
+        positions = dbPositions.map(pos => {
+          const parsedSize = parseFloat(pos.quantity) || parseFloat(pos.size) || 0;
+          return {
+            id: pos.id,
+            symbol: pos.symbol,
+            side: pos.side,
+            entry: parseFloat(pos.entry_price),
+            size: parsedSize,
+            usd_amount: parseFloat(pos.usd_amount || 0),
+            swap: 0.00,
+            time: new Date(pos.created_at).toLocaleString(),
+            take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
+            stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
+          };
+        });
       }
     } catch (err) {
       console.error('Failed to fetch trades from Supabase:', err);
     }
   }
-
-  // 5. Generate a deterministic 6-digit account number from user UUID
-  let hash = 0;
-  for (let i = 0; i < user.id.length; i++) {
-    hash = user.id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const accountNumber = Math.abs(hash % 900000) + 100000;
 
   return (
     <TradeClientPage 
@@ -141,4 +132,3 @@ export default async function TradePage() {
     />
   );
 }
-

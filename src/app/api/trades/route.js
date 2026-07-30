@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase';
+import { getActiveWallet } from '@/lib/activeWallet';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,9 +32,28 @@ function writeLocalDb(db) {
 }
 
 // Local helper to place trade order
-function handleLocalPost(userId, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss }) {
+function handleLocalPost(userId, activeWalletId, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss }) {
   const db = readLocalDb();
-  const balance = parseFloat(db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00) || 0;
+  
+  if (!db.wallets_multi) db.wallets_multi = [];
+  let wallet = db.wallets_multi.find(w => w.id === activeWalletId && w.user_id === userId);
+  
+  if (!wallet) {
+    // fallback to legacy wallet if matches
+    const legacyBal = db.wallets && db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00;
+    wallet = {
+      id: userId,
+      user_id: userId,
+      account_number: '910502',
+      virtual_balance: legacyBal,
+      initial_balance: db.initial_balances?.[userId] || 10000.00,
+      balance_configured: true,
+      updated_at: new Date().toISOString()
+    };
+    db.wallets_multi.push(wallet);
+  }
+
+  const balance = parseFloat(wallet.virtual_balance) || 0;
   const numUsdAmount = parseFloat(usd_amount) || 0;
 
   if (balance < numUsdAmount) {
@@ -41,11 +61,15 @@ function handleLocalPost(userId, { symbol, side, quantity, entry_price, usd_amou
   }
 
   const newBalance = parseFloat((balance - numUsdAmount).toFixed(2));
-  db.wallets[userId] = newBalance;
+  wallet.virtual_balance = newBalance;
+  if (wallet.id === userId && db.wallets) {
+    db.wallets[userId] = newBalance; // Keep legacy updated
+  }
 
   const newTrade = {
     id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
     user_id: userId,
+    wallet_id: activeWalletId,
     symbol,
     side: side.toLowerCase(),
     status: 'open',
@@ -87,7 +111,7 @@ function handleLocalPut(userId, { tradeId, exitPrice }) {
   }
 
   const numExitPrice = parseFloat(exitPrice);
-  const quantity = parseFloat(trade.quantity);
+  const quantity = parseFloat(trade.quantity || trade.size || 0);
   const entryPrice = parseFloat(trade.entry_price);
   const usdAmount = parseFloat(trade.usd_amount);
 
@@ -109,10 +133,32 @@ function handleLocalPut(userId, { tradeId, exitPrice }) {
   pnl = parseFloat(pnl.toFixed(2));
   const returnedAmount = usdAmount + pnl;
 
-  const balance = db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00;
+  const targetWalletId = trade.wallet_id || userId;
+  if (!db.wallets_multi) db.wallets_multi = [];
+  let wallet = db.wallets_multi.find(w => w.id === targetWalletId && w.user_id === userId);
+  
+  if (!wallet) {
+    const legacyBal = db.wallets && db.wallets[userId] !== undefined ? db.wallets[userId] : 10000.00;
+    wallet = {
+      id: userId,
+      user_id: userId,
+      account_number: '910502',
+      virtual_balance: legacyBal,
+      initial_balance: db.initial_balances?.[userId] || 10000.00,
+      balance_configured: true,
+      updated_at: new Date().toISOString()
+    };
+    db.wallets_multi.push(wallet);
+  }
+
+  const balance = parseFloat(wallet.virtual_balance);
   const newBalance = parseFloat((balance + returnedAmount).toFixed(2));
 
-  db.wallets[userId] = newBalance;
+  wallet.virtual_balance = newBalance;
+  if (wallet.id === userId && db.wallets) {
+    db.wallets[userId] = newBalance;
+  }
+
   trade.status = 'closed';
   trade.exit_price = numExitPrice;
   trade.pnl = pnl;
@@ -128,7 +174,7 @@ function handleLocalPut(userId, { tradeId, exitPrice }) {
   });
 }
 
-// GET: Fetch trades for the logged-in user
+// GET: Fetch trades for the logged-in user and active account
 export async function GET(request) {
   const supabase = await createClient();
   
@@ -142,21 +188,37 @@ export async function GET(request) {
   const status = searchParams.get('status') || 'open'; // 'open', 'closed', or 'all'
 
   try {
-    // Verify user wallet exists in Supabase, else force local database fallback
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const { activeWallet, useLocalFallback } = await getActiveWallet(user.id);
 
-    if (walletError || !wallet) {
-      throw new Error('User wallet not found in Supabase. Forcing local database fallback.');
+    if (useLocalFallback) {
+      throw new Error('Forcing local database fallback.');
     }
 
-    const { data: trades, error } = await supabase
+    let query = supabase
       .from('trades')
       .select('*')
       .eq('user_id', user.id);
+    
+    // Filter by wallet_id
+    if (activeWallet.id === user.id) {
+      // For default primary wallet, fetch both explicitly marked trades and unassigned trades
+      query = query.or(`wallet_id.eq.${activeWallet.id},wallet_id.is.null`);
+    } else {
+      query = query.eq('wallet_id', activeWallet.id);
+    }
+
+    let { data: trades, error } = await query;
+
+    // Fallback if wallet_id column doesn't exist in trades table yet
+    if (error && (error.message?.includes('column') || error.message?.includes('wallet_id'))) {
+      const fallbackRes = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id);
+      trades = fallbackRes.data;
+      error = fallbackRes.error;
+    }
+
     if (error) {
       throw error;
     }
@@ -174,30 +236,38 @@ export async function GET(request) {
       filtered.sort((a, b) => new Date(b.opened_at || b.created_at) - new Date(a.opened_at || a.created_at));
     }
 
-    // Map to the format expected by the frontend
-    const formattedTrades = filtered.map(t => ({
-      id: t.id,
-      symbol: t.symbol,
-      side: t.side,
-      entry: parseFloat(t.entry_price),
-      exit: t.exit_price ? parseFloat(t.exit_price) : null,
-      size: parseFloat(t.quantity || t.size || 0),
-      quantity: parseFloat(t.quantity || t.size || 0),
-      usd_amount: parseFloat(t.usd_amount || 0),
-      pnl: t.pnl ? parseFloat(t.pnl) : 0,
-      time: new Date(t.opened_at || t.created_at).toLocaleString(),
-      closed_time: t.closed_at ? new Date(t.closed_at).toLocaleString() : null,
-      status: t.status,
-      take_profit: t.take_profit ? parseFloat(t.take_profit) : null,
-      stop_loss: t.stop_loss ? parseFloat(t.stop_loss) : null
-    }));
+    // Map to the format expected by the frontend (fixing truthy "0.00" string bug)
+    const formattedTrades = filtered.map(t => {
+      const parsedSize = parseFloat(t.quantity) || parseFloat(t.size) || 0;
+      return {
+        id: t.id,
+        symbol: t.symbol,
+        side: t.side,
+        entry: parseFloat(t.entry_price),
+        exit: t.exit_price ? parseFloat(t.exit_price) : null,
+        size: parsedSize,
+        quantity: parsedSize,
+        usd_amount: parseFloat(t.usd_amount || 0),
+        pnl: t.pnl ? parseFloat(t.pnl) : 0,
+        time: new Date(t.opened_at || t.created_at).toLocaleString(),
+        closed_time: t.closed_at ? new Date(t.closed_at).toLocaleString() : null,
+        status: t.status,
+        take_profit: t.take_profit ? parseFloat(t.take_profit) : null,
+        stop_loss: t.stop_loss ? parseFloat(t.stop_loss) : null
+      };
+    });
 
     return NextResponse.json(formattedTrades);
   } catch (error) {
     console.warn('[Supabase cache fallback] Fetching trades locally:', error.message);
     
     const db = readLocalDb();
-    const userTrades = db.trades.filter(t => t.user_id === user.id);
+    const { activeWallet } = await getActiveWallet(user.id);
+
+    const userTrades = db.trades.filter(t => 
+      t.user_id === user.id && 
+      (t.wallet_id === activeWallet.id || (!t.wallet_id && activeWallet.id === user.id))
+    );
     
     let filtered = userTrades;
     if (status !== 'all') {
@@ -210,22 +280,25 @@ export async function GET(request) {
       filtered.sort((a, b) => new Date(b.opened_at) - new Date(a.opened_at));
     }
 
-    const formattedTrades = filtered.map(t => ({
-      id: t.id,
-      symbol: t.symbol,
-      side: t.side,
-      entry: parseFloat(t.entry_price),
-      exit: t.exit_price ? parseFloat(t.exit_price) : null,
-      size: parseFloat(t.quantity),
-      quantity: parseFloat(t.quantity),
-      usd_amount: parseFloat(t.usd_amount),
-      pnl: t.pnl ? parseFloat(t.pnl) : 0,
-      time: new Date(t.opened_at).toLocaleString(),
-      closed_time: t.closed_at ? new Date(t.closed_at).toLocaleString() : null,
-      status: t.status,
-      take_profit: t.take_profit ? parseFloat(t.take_profit) : null,
-      stop_loss: t.stop_loss ? parseFloat(t.stop_loss) : null
-    }));
+    const formattedTrades = filtered.map(t => {
+      const parsedSize = parseFloat(t.quantity) || parseFloat(t.size) || 0;
+      return {
+        id: t.id,
+        symbol: t.symbol,
+        side: t.side,
+        entry: parseFloat(t.entry_price),
+        exit: t.exit_price ? parseFloat(t.exit_price) : null,
+        size: parsedSize,
+        quantity: parsedSize,
+        usd_amount: parseFloat(t.usd_amount),
+        pnl: t.pnl ? parseFloat(t.pnl) : 0,
+        time: new Date(t.opened_at).toLocaleString(),
+        closed_time: t.closed_at ? new Date(t.closed_at).toLocaleString() : null,
+        status: t.status,
+        take_profit: t.take_profit ? parseFloat(t.take_profit) : null,
+        stop_loss: t.stop_loss ? parseFloat(t.stop_loss) : null
+      };
+    });
 
     return NextResponse.json(formattedTrades);
   }
@@ -264,64 +337,73 @@ export async function POST(request) {
   }
 
   try {
-    // 2. Fetch user wallet balance
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const { activeWallet, useLocalFallback: forceLocal } = await getActiveWallet(user.id);
 
-    if (walletError) {
-      if (walletError.message?.includes('schema cache') || walletError.message?.includes('does not exist') || walletError.message?.includes('column')) {
-        return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
-      }
-      throw walletError;
+    if (forceLocal) {
+      return handleLocalPost(user.id, activeWallet.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
     }
 
-    const balance = parseFloat(wallet.virtual_balance) || 0;
+    const balance = parseFloat(activeWallet.virtual_balance) || 0;
     if (balance < numUsdAmount) {
       return NextResponse.json({ error: 'Required margin/amount exceeds available balance' }, { status: 400 });
     }
 
-    // 3. Deduct committed usd_amount from wallet virtual_balance
+    // 3. Deduct committed usd_amount from active wallet virtual_balance
     const newBalance = balance - numUsdAmount;
     const { error: updateWalletError } = await supabase
       .from('wallets')
       .update({ virtual_balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('user_id', user.id);
+      .eq('id', activeWallet.id);
 
     if (updateWalletError) {
       throw new Error(`Failed to update wallet: ${updateWalletError.message}`);
     }
 
     // 4. Insert trade row
-    const { data: trade, error: insertError } = await supabase
+    let insertData = {
+      user_id: user.id,
+      wallet_id: activeWallet.id,
+      symbol,
+      side: side.toLowerCase(), // Store lowercase
+      status: 'open',
+      entry_price: numEntryPrice,
+      quantity: numQuantity,
+      size: numQuantity, // compatibility
+      usd_amount: numUsdAmount,
+      pnl: 0.00,
+      take_profit: take_profit ? parseFloat(take_profit) : null,
+      stop_loss: stop_loss ? parseFloat(stop_loss) : null
+    };
+
+    let { data: trade, error: insertError } = await supabase
       .from('trades')
-      .insert({
-        user_id: user.id,
-        symbol,
-        side: side.toLowerCase(), // Store lowercase
-        status: 'open',
-        entry_price: numEntryPrice,
-        quantity: numQuantity,
-        size: numQuantity, // compatibility
-        usd_amount: numUsdAmount,
-        pnl: 0.00,
-        take_profit: take_profit ? parseFloat(take_profit) : null,
-        stop_loss: stop_loss ? parseFloat(stop_loss) : null
-      })
+      .insert(insertData)
       .select()
       .single();
+
+    // Fallback if wallet_id column doesn't exist in trades table yet
+    if (insertError && (insertError.message?.includes('column') || insertError.message?.includes('wallet_id'))) {
+      const fallbackInsertData = { ...insertData };
+      delete fallbackInsertData.wallet_id;
+      
+      const fallbackInsert = await supabase
+        .from('trades')
+        .insert(fallbackInsertData)
+        .select()
+        .single();
+      trade = fallbackInsert.data;
+      insertError = fallbackInsert.error;
+    }
 
     if (insertError) {
       // Rollback wallet balance update if trade insert fails
       await supabase
          .from('wallets')
          .update({ virtual_balance: balance, updated_at: new Date().toISOString() })
-         .eq('user_id', user.id);
+         .eq('id', activeWallet.id);
       
-      if (insertError.message?.includes('schema cache') || insertError.message?.includes('does not exist')) {
-        return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
+      if (insertError.message?.includes('schema cache') || insertError.message?.includes('does not exist') || insertError.code === 'PGRST204') {
+        return handleLocalPost(user.id, activeWallet.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
       }
       throw insertError;
     }
@@ -333,7 +415,8 @@ export async function POST(request) {
     });
   } catch (error) {
     console.warn('[Supabase cache fallback] Executing trade locally:', error.message);
-    return handleLocalPost(user.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
+    const { activeWallet } = await getActiveWallet(user.id);
+    return handleLocalPost(user.id, activeWallet.id, { symbol, side, quantity, entry_price, usd_amount, take_profit, stop_loss });
   }
 }
 
@@ -366,17 +449,6 @@ export async function PUT(request) {
   }
 
   try {
-    // Check if user has a wallet in Supabase, else force local database fallback
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      throw new Error('User wallet not found in Supabase. Forcing local database fallback.');
-    }
-
     // 2. Fetch trade details
     const { data: trade, error: fetchError } = await supabase
       .from('trades')
@@ -386,6 +458,9 @@ export async function PUT(request) {
       .single();
 
     if (fetchError) {
+      if (fetchError.message?.includes('schema cache') || fetchError.message?.includes('does not exist')) {
+        return handleLocalPut(user.id, { tradeId, exitPrice });
+      }
       throw fetchError;
     }
 
@@ -394,7 +469,7 @@ export async function PUT(request) {
     }
 
     // 3. Calculate final P&L
-    const quantity = parseFloat(trade.quantity || trade.size);
+    const quantity = parseFloat(trade.quantity || trade.size || 0);
     const entryPrice = parseFloat(trade.entry_price);
     const usdAmount = parseFloat(trade.usd_amount || 0);
     
@@ -417,7 +492,19 @@ export async function PUT(request) {
     pnl = parseFloat(pnl.toFixed(2));
     const returnedAmount = usdAmount + pnl;
 
-    // 4. Resolve wallet balance from already fetched wallet
+    // 4. Resolve correct target wallet
+    const targetWalletId = trade.wallet_id || user.id;
+
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('id', targetWalletId)
+      .single();
+
+    if (walletError || !wallet) {
+      throw new Error('User wallet not found in Supabase. Forcing local database fallback.');
+    }
+
     const balance = parseFloat(wallet.virtual_balance);
     const newBalance = parseFloat((balance + returnedAmount).toFixed(2));
 
@@ -425,7 +512,7 @@ export async function PUT(request) {
     const { error: updateWalletError } = await supabase
       .from('wallets')
       .update({ virtual_balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('user_id', user.id);
+      .eq('id', targetWalletId);
 
     if (updateWalletError) {
       throw new Error(`Failed to credit wallet balance: ${updateWalletError.message}`);
@@ -447,7 +534,7 @@ export async function PUT(request) {
       await supabase
         .from('wallets')
         .update({ virtual_balance: balance, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+        .eq('id', targetWalletId);
 
       throw updateTradeError;
     }

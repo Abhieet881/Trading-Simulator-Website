@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- 2. Create public.wallets table
 CREATE TABLE IF NOT EXISTS public.wallets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    account_number TEXT,
+    account_name TEXT,
     virtual_balance NUMERIC(12, 2) DEFAULT 0.00 NOT NULL,
     currency TEXT DEFAULT 'USD' NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,

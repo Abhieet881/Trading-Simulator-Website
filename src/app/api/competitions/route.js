@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase';
+import { getActiveWallet } from '@/lib/activeWallet';
 import fs from 'fs';
 import path from 'path';
 
@@ -286,31 +287,15 @@ export async function POST(req) {
       initialEquity = comp.initial_equity ? parseFloat(comp.initial_equity) : 10000;
     }
 
-    // 2. Get user's wallet virtual_balance
-    let userWalletBalance = 0.00;
-    let balanceConfigured = false;
-    if (isSupabase) {
-      try {
-        const { data: wallet, error: walletErr } = await supabase
-          .from('wallets')
-          .select('virtual_balance, balance_configured')
-          .eq('user_id', user.id)
-          .single();
-        if (walletErr) throw walletErr;
-        if (wallet) {
-          userWalletBalance = parseFloat(wallet.virtual_balance);
-          balanceConfigured = wallet.balance_configured || false;
-        }
-      } catch (e) {
-        isSupabase = false;
-      }
+    // 2. Resolve active wallet
+    const { activeWallet, useLocalFallback: forceLocal } = await getActiveWallet(user.id);
+    
+    if (forceLocal) {
+      isSupabase = false;
     }
 
-    if (!isSupabase) {
-      const db = getLocalDb();
-      userWalletBalance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-      balanceConfigured = db.wallets_configured?.[user.id] || false;
-    }
+    userWalletBalance = parseFloat(activeWallet.virtual_balance || 0);
+    balanceConfigured = activeWallet.balance_configured || false;
 
     // Check if user has configured starting balance
     if (!balanceConfigured) {
@@ -334,11 +319,11 @@ export async function POST(req) {
     };
 
     if (isSupabase) {
-      // Deduct fee from wallet
+      // Deduct fee from active wallet
       const { error: walletUpdateErr } = await supabase
         .from('wallets')
         .update({ virtual_balance: balanceAfterFee, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+        .eq('id', activeWallet.id);
       
       if (walletUpdateErr) {
         console.error('Failed to deduct fee from wallet in Supabase:', walletUpdateErr);
@@ -354,7 +339,7 @@ export async function POST(req) {
         await supabase
           .from('wallets')
           .update({ virtual_balance: userWalletBalance, updated_at: new Date().toISOString() })
-          .eq('user_id', user.id);
+          .eq('id', activeWallet.id);
 
         if (insertErr.code === '23505') {
           return NextResponse.json({ error: 'You have already joined this competition.' }, { status: 400 });
@@ -374,8 +359,30 @@ export async function POST(req) {
         return NextResponse.json({ error: 'You have already joined this competition.' }, { status: 400 });
       }
 
-      // Deduct fee from local wallet
-      db.wallets[user.id] = balanceAfterFee;
+      // Deduct fee from local wallets_multi
+      if (!db.wallets_multi) db.wallets_multi = [];
+      let wallet = db.wallets_multi.find(w => w.id === activeWallet.id && w.user_id === user.id);
+      if (wallet) {
+        wallet.virtual_balance = balanceAfterFee;
+        wallet.updated_at = new Date().toISOString();
+      } else {
+        wallet = {
+          id: activeWallet.id,
+          user_id: user.id,
+          account_number: activeWallet.account_number,
+          virtual_balance: balanceAfterFee,
+          initial_balance: activeWallet.initial_balance || 10000.00,
+          balance_configured: true,
+          updated_at: new Date().toISOString()
+        };
+        db.wallets_multi.push(wallet);
+      }
+
+      // Keep legacy wallets dictionary updated for default account
+      if (activeWallet.id === user.id) {
+        if (!db.wallets) db.wallets = {};
+        db.wallets[user.id] = balanceAfterFee;
+      }
 
       newParticipant.id = Math.random().toString(36).substring(2, 15);
       newParticipant.joined_at = new Date().toISOString();

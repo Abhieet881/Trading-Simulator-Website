@@ -1,6 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getActiveWallet } from '@/lib/activeWallet';
 import HistoryClientPage from './HistoryClientPage';
 
 export const metadata = {
@@ -35,22 +36,10 @@ export default async function HistoryPage() {
 
   const displayName = dbUser?.name || user.user_metadata?.name || 'Trader';
 
-  // Determine if using local fallback by checking if wallet exists in Supabase
-  let useLocalFallback = false;
-  try {
-    const { data: dbWallet, error: dbWalletError } = await supabase
-      .from('wallets')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-    if (dbWalletError || !dbWallet) {
-      useLocalFallback = true;
-    }
-  } catch (e) {
-    useLocalFallback = true;
-  }
+  // 3. Resolve active wallet
+  const { activeWallet, useLocalFallback } = await getActiveWallet(user.id);
 
-  // 3. Fetch all closed trades (with fallback support)
+  // 4. Fetch all closed trades for this wallet (with fallback support)
   let closedTrades = [];
   if (useLocalFallback) {
     const fs = require('fs');
@@ -59,18 +48,41 @@ export default async function HistoryPage() {
     if (fs.existsSync(localDbPath)) {
       try {
         const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        closedTrades = db.trades.filter(t => t.user_id === user.id && t.status === 'closed');
+        closedTrades = db.trades.filter(t => 
+          t.user_id === user.id && 
+          t.status === 'closed' &&
+          (t.wallet_id === activeWallet.id || (!t.wallet_id && activeWallet.id === user.id))
+        );
         closedTrades.sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at));
       } catch (e) {}
     }
   } else {
     try {
-      const { data: dbTrades, error: dbTradesError } = await supabase
+      let query = supabase
         .from('trades')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'closed')
-        .order('closed_at', { ascending: false });
+        .eq('status', 'closed');
+      
+      if (activeWallet.id === user.id) {
+        query = query.or(`wallet_id.eq.${activeWallet.id},wallet_id.is.null`);
+      } else {
+        query = query.eq('wallet_id', activeWallet.id);
+      }
+
+      let { data: dbTrades, error: dbTradesError } = await query.order('closed_at', { ascending: false });
+
+      // Fallback if wallet_id column doesn't exist in trades table yet
+      if (dbTradesError && (dbTradesError.message?.includes('column') || dbTradesError.message?.includes('wallet_id'))) {
+        const fallbackRes = await supabase
+          .from('trades')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'closed')
+          .order('closed_at', { ascending: false });
+        dbTrades = fallbackRes.data;
+        dbTradesError = fallbackRes.error;
+      }
 
       if (dbTradesError) {
         throw dbTradesError;
@@ -82,19 +94,22 @@ export default async function HistoryPage() {
     }
   }
 
-  // Map to unified format
-  const formattedTrades = closedTrades.map(t => ({
-    id: t.id,
-    symbol: t.symbol,
-    side: t.side,
-    entry: parseFloat(t.entry_price),
-    exit: t.exit_price ? parseFloat(t.exit_price) : 0,
-    size: parseFloat(t.quantity || t.size || 0),
-    usd_amount: parseFloat(t.usd_amount || 0),
-    pnl: parseFloat(t.pnl || 0),
-    opened_at: t.opened_at || t.created_at,
-    closed_at: t.closed_at
-  }));
+  // Map to unified format (fixing truthy "0.00" string bug)
+  const formattedTrades = closedTrades.map(t => {
+    const parsedSize = parseFloat(t.quantity) || parseFloat(t.size) || 0;
+    return {
+      id: t.id,
+      symbol: t.symbol,
+      side: t.side,
+      entry: parseFloat(t.entry_price),
+      exit: t.exit_price ? parseFloat(t.exit_price) : 0,
+      size: parsedSize,
+      usd_amount: parseFloat(t.usd_amount || 0),
+      pnl: parseFloat(t.pnl || 0),
+      opened_at: t.opened_at || t.created_at,
+      closed_at: t.closed_at
+    };
+  });
 
   return (
     <HistoryClientPage 

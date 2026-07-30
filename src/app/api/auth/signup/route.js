@@ -72,11 +72,14 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: userError.message }, { status: 400 });
     }
 
+    const defaultAccNum = String(Math.floor(100000 + Math.random() * 900000));
     // 3. Insert virtual wallet for the user into public.wallets
     const { error: walletError } = await supabase
       .from('wallets')
       .insert({
         user_id: authUser.id,
+        account_number: defaultAccNum,
+        account_name: 'Primary Demo',
         virtual_balance: 0.00,
         currency: 'USD',
         initial_balance: 0.00,

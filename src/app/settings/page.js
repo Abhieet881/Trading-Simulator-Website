@@ -1,6 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getActiveWallet } from '@/lib/activeWallet';
 import SettingsClientPage from './SettingsClientPage';
 
 export const metadata = {
@@ -39,48 +40,11 @@ export default async function SettingsPage() {
   const createdAt = dbUser?.created_at || user.created_at || new Date().toISOString();
   const planType = dbUser?.plan_type || 'free';
 
-  // 3. Fetch user wallet balance (with local JSON fallback)
-  let balance = 0.00;
-  let initialConfiguredBalance = 10000.00;
-  try {
-    const { data: dbWallet, error: dbWalletError } = await supabase
-      .from('wallets')
-      .select('virtual_balance, balance_configured, initial_balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (dbWalletError) {
-      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
-        const fs = require('fs');
-        const path = require('path');
-        const localDbPath = path.join(process.cwd(), 'local_db.json');
-        if (fs.existsSync(localDbPath)) {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-          initialConfiguredBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 10000.00;
-        }
-      } else {
-        throw dbWalletError;
-      }
-    } else if (dbWallet) {
-      balance = parseFloat(dbWallet.virtual_balance || 0);
-      initialConfiguredBalance = parseFloat(dbWallet.initial_balance || 10000.00);
-    }
-  } catch (err) {
-    console.error('Failed to fetch wallet in settings server load:', err);
-    const fs = require('fs');
-    const path = require('path');
-    const localDbPath = path.join(process.cwd(), 'local_db.json');
-    if (fs.existsSync(localDbPath)) {
-      try {
-        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-        initialConfiguredBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 10000.00;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
+  // 3. Fetch active wallet details
+  const { activeWallet, wallets } = await getActiveWallet(user.id);
+  const balance = parseFloat(activeWallet.virtual_balance || 0);
+  const initialConfiguredBalance = parseFloat(activeWallet.initial_balance || 10000.00);
+  const accountNumber = activeWallet.account_number;
 
   return (
     <SettingsClientPage 
@@ -91,6 +55,9 @@ export default async function SettingsPage() {
       initialPlanType={planType}
       initialBalance={balance}
       initialConfiguredBalance={initialConfiguredBalance}
+      accountNumber={accountNumber}
+      accountName={activeWallet.account_name}
+      initialWallets={wallets}
     />
   );
 }
