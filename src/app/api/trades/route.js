@@ -142,15 +142,22 @@ export async function GET(request) {
   const status = searchParams.get('status') || 'open'; // 'open', 'closed', or 'all'
 
   try {
+    // Verify user wallet exists in Supabase, else force local database fallback
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (walletError || !wallet) {
+      throw new Error('User wallet not found in Supabase. Forcing local database fallback.');
+    }
+
     const { data: trades, error } = await supabase
       .from('trades')
       .select('*')
       .eq('user_id', user.id);
-      
     if (error) {
-      if (error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
-        throw error; // Let the catch block handle the fallback
-      }
       throw error;
     }
 
@@ -174,8 +181,8 @@ export async function GET(request) {
       side: t.side,
       entry: parseFloat(t.entry_price),
       exit: t.exit_price ? parseFloat(t.exit_price) : null,
-      size: parseFloat(t.quantity || t.size),
-      quantity: parseFloat(t.quantity || t.size),
+      size: parseFloat(t.quantity || t.size || 0),
+      quantity: parseFloat(t.quantity || t.size || 0),
       usd_amount: parseFloat(t.usd_amount || 0),
       pnl: t.pnl ? parseFloat(t.pnl) : 0,
       time: new Date(t.opened_at || t.created_at).toLocaleString(),
@@ -359,6 +366,17 @@ export async function PUT(request) {
   }
 
   try {
+    // Check if user has a wallet in Supabase, else force local database fallback
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (walletError || !wallet) {
+      throw new Error('User wallet not found in Supabase. Forcing local database fallback.');
+    }
+
     // 2. Fetch trade details
     const { data: trade, error: fetchError } = await supabase
       .from('trades')
@@ -368,10 +386,7 @@ export async function PUT(request) {
       .single();
 
     if (fetchError) {
-      if (fetchError.message?.includes('schema cache') || fetchError.message?.includes('does not exist')) {
-        return handleLocalPut(user.id, { tradeId, exitPrice });
-      }
-      return NextResponse.json({ error: 'Position not found' }, { status: 404 });
+      throw fetchError;
     }
 
     if (trade.status === 'closed') {
@@ -402,17 +417,7 @@ export async function PUT(request) {
     pnl = parseFloat(pnl.toFixed(2));
     const returnedAmount = usdAmount + pnl;
 
-    // 4. Fetch current wallet balance
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      throw new Error('Wallet not found');
-    }
-
+    // 4. Resolve wallet balance from already fetched wallet
     const balance = parseFloat(wallet.virtual_balance);
     const newBalance = parseFloat((balance + returnedAmount).toFixed(2));
 

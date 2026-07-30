@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { 
   TrendingUp, TrendingDown, User, AlertCircle, Info, CheckCircle2, Search,
   Settings, HelpCircle, ChevronDown, Maximize2, Plus, Minus, Lock, Unlock,
-  Eye, EyeOff, Trash2, RefreshCw, Sliders, X
+  Eye, EyeOff, Trash2, RefreshCw, Sliders, X, Menu
 } from 'lucide-react';
 import UserDropdown from '../dashboard/UserDropdown';
 
-// Asset definitions with their configuration
+const FOREX_SYMBOLS = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD', 'USD/CHF'];
+
 const ASSETS = {
   'BTC': {
     symbol: 'BTC',
@@ -18,16 +19,11 @@ const ASSETS = {
     price: 67240.50,
     high24h: 68100.00,
     low24h: 65890.00,
-    volume24h: '18.4K BTC ($1.2B)',
+    volume24h: '18.4K BTC',
     change24h: '+2.45%',
     type: 'Crypto',
     unit: 'BTC',
-    iconColor: 'text-[#F0B90B] bg-[#F0B90B]/10',
-    svgIcon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.25 15.5h-2.5v-1.5H12c1.38 0 2.5-1.12 2.5-2.5 0-1.04-.63-1.92-1.53-2.31.72-.42 1.21-1.2 1.21-2.1 0-1.38-1.12-2.5-2.5-2.5h-.43V3.5h2.5v1.5h1v1.5h-1v5h1v1.5h-1v4.5h1v1.5zm-3.5-3v-2.5h2c.69 0 1.25.56 1.25 1.25s-.56 1.25-1.25 1.25h-2zm0-4.5V8h1.75c.69 0 1.25.56 1.25 1.25s-.56 1.25-1.25 1.25h-1.75z"/>
-      </svg>
-    )
+    iconColor: 'text-[#F0B90B] bg-[#F0B90B]/10'
   },
   'ETH': {
     symbol: 'ETH',
@@ -36,16 +32,76 @@ const ASSETS = {
     price: 3482.15,
     high24h: 3560.40,
     low24h: 3410.20,
-    volume24h: '142K ETH ($495M)',
+    volume24h: '142K ETH',
     change24h: '-1.20%',
     type: 'Crypto',
     unit: 'ETH',
-    iconColor: 'text-[#627EEA] bg-[#627EEA]/10',
-    svgIcon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L3.5 16.02L12 22L20.5 16.02L12 2ZM12 4.67L18.11 14.8L12 18.25L5.89 14.8L12 4.67Z" />
-      </svg>
-    )
+    iconColor: 'text-[#627EEA] bg-[#627EEA]/10'
+  },
+  'SOL': {
+    symbol: 'SOL',
+    pair: 'SOL/USDT',
+    name: 'Solana',
+    price: 152.40,
+    high24h: 156.20,
+    low24h: 148.50,
+    volume24h: '840K SOL',
+    change24h: '+3.12%',
+    type: 'Crypto',
+    unit: 'SOL',
+    iconColor: 'text-[#00FFA3] bg-[#00FFA3]/10'
+  },
+  'BNB': {
+    symbol: 'BNB',
+    pair: 'BNB/USDT',
+    name: 'BNB',
+    price: 585.20,
+    high24h: 592.10,
+    low24h: 575.80,
+    volume24h: '120K BNB',
+    change24h: '+1.45%',
+    type: 'Crypto',
+    unit: 'BNB',
+    iconColor: 'text-[#F3BA2F] bg-[#F3BA2F]/10'
+  },
+  'XRP': {
+    symbol: 'XRP',
+    pair: 'XRP/USDT',
+    name: 'Ripple',
+    price: 0.6250,
+    high24h: 0.6380,
+    low24h: 0.6120,
+    volume24h: '45M XRP',
+    change24h: '-0.45%',
+    type: 'Crypto',
+    unit: 'XRP',
+    iconColor: 'text-[#23292F] bg-[#23292F]/10'
+  },
+  'ADA': {
+    symbol: 'ADA',
+    pair: 'ADA/USDT',
+    name: 'Cardano',
+    price: 0.4450,
+    high24h: 0.4580,
+    low24h: 0.4350,
+    volume24h: '22M ADA',
+    change24h: '-1.15%',
+    type: 'Crypto',
+    unit: 'ADA',
+    iconColor: 'text-[#0033AD] bg-[#0033AD]/10'
+  },
+  'DOGE': {
+    symbol: 'DOGE',
+    pair: 'DOGE/USDT',
+    name: 'Dogecoin',
+    price: 0.1250,
+    high24h: 0.1320,
+    low24h: 0.1180,
+    volume24h: '180M DOGE',
+    change24h: '+4.85%',
+    type: 'Crypto',
+    unit: 'DOGE',
+    iconColor: 'text-[#C2A633] bg-[#C2A633]/10'
   },
   'EUR/USD': {
     symbol: 'EUR/USD',
@@ -54,18 +110,11 @@ const ASSETS = {
     price: 1.0845,
     high24h: 1.0890,
     low24h: 1.0812,
-    volume24h: '85K Lots ($8.5B)',
+    volume24h: '85K Lots',
     change24h: '+0.12%',
     type: 'Forex',
     unit: 'EUR',
-    iconColor: 'text-[#003399] bg-[#003399]/10',
-    svgIcon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="16" />
-        <line x1="8" y1="12" x2="16" y2="12" />
-      </svg>
-    )
+    iconColor: 'text-[#003399] bg-[#003399]/10'
   },
   'GBP/USD': {
     symbol: 'GBP/USD',
@@ -74,17 +123,63 @@ const ASSETS = {
     price: 1.2825,
     high24h: 1.2910,
     low24h: 1.2780,
-    volume24h: '62K Lots ($6.2B)',
+    volume24h: '62K Lots',
     change24h: '+0.18%',
     type: 'Forex',
     unit: 'GBP',
-    iconColor: 'text-[#C8102E] bg-[#C8102E]/10',
-    svgIcon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 6V18M8 12H16" />
-      </svg>
-    )
+    iconColor: 'text-[#C8102E] bg-[#C8102E]/10'
+  },
+  'USD/JPY': {
+    symbol: 'USD/JPY',
+    pair: 'USD/JPY',
+    name: 'US Dollar / Japanese Yen',
+    price: 155.60,
+    high24h: 156.40,
+    low24h: 154.80,
+    volume24h: '98K Lots',
+    change24h: '-0.22%',
+    type: 'Forex',
+    unit: 'JPY',
+    iconColor: 'text-[#BC002D] bg-[#BC002D]/10'
+  },
+  'AUD/USD': {
+    symbol: 'AUD/USD',
+    pair: 'AUD/USD',
+    name: 'Australian Dollar / US Dollar',
+    price: 0.6650,
+    high24h: 0.6690,
+    low24h: 0.6610,
+    volume24h: '44K Lots',
+    change24h: '+0.05%',
+    type: 'Forex',
+    unit: 'AUD',
+    iconColor: 'text-[#00008B] bg-[#00008B]/10'
+  },
+  'USD/CAD': {
+    symbol: 'USD/CAD',
+    pair: 'USD/CAD',
+    name: 'US Dollar / Canadian Dollar',
+    price: 1.3720,
+    high24h: 1.3780,
+    low24h: 1.3680,
+    volume24h: '38K Lots',
+    change24h: '+0.15%',
+    type: 'Forex',
+    unit: 'CAD',
+    iconColor: 'text-[#FF0000] bg-[#FF0000]/10'
+  },
+  'USD/CHF': {
+    symbol: 'USD/CHF',
+    pair: 'USD/CHF',
+    name: 'US Dollar / Swiss Franc',
+    price: 0.9020,
+    high24h: 0.9065,
+    low24h: 0.8980,
+    volume24h: '31K Lots',
+    change24h: '-0.10%',
+    type: 'Forex',
+    unit: 'CHF',
+    iconColor: 'text-[#D52B1E] bg-[#D52B1E]/10'
   },
   'XAU/USD': {
     symbol: 'XAU/USD',
@@ -93,16 +188,11 @@ const ASSETS = {
     price: 2380.50,
     high24h: 2405.00,
     low24h: 2368.00,
-    volume24h: '38K Lots ($3.8B)',
+    volume24h: '38K Lots',
     change24h: '+0.79%',
-    type: 'Commodities',
+    type: 'Forex',
     unit: 'XAU',
-    iconColor: 'text-[#D4AF37] bg-[#D4AF37]/10',
-    svgIcon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L2 22h20L12 2zm0 4.25L18.4 18H5.6L12 6.25z" />
-      </svg>
-    )
+    iconColor: 'text-[#D4AF37] bg-[#D4AF37]/10'
   },
   'AAPL': {
     symbol: 'AAPL',
@@ -111,16 +201,89 @@ const ASSETS = {
     price: 189.84,
     high24h: 191.20,
     low24h: 188.10,
-    volume24h: '42.5M Shares ($8.1B)',
+    volume24h: '42.5M Shares',
     change24h: '+1.85%',
     type: 'Stocks',
     unit: 'AAPL',
-    iconColor: 'text-[#A3AAAE] bg-[#A3AAAE]/10',
-    svgIcon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.05-1 .04-2.22.67-2.94 1.52-.64.74-1.2 1.88-1.05 2.98 1.12.09 2.27-.57 3-1.45z"/>
-      </svg>
-    )
+    iconColor: 'text-[#A3AAAE] bg-[#A3AAAE]/10'
+  },
+  'TSLA': {
+    symbol: 'TSLA',
+    pair: 'TSLA/USD',
+    name: 'Tesla Inc.',
+    price: 180.20,
+    high24h: 184.50,
+    low24h: 178.10,
+    volume24h: '88M Shares',
+    change24h: '-0.85%',
+    type: 'Stocks',
+    unit: 'TSLA',
+    iconColor: 'text-[#CC0000] bg-[#CC0000]/10'
+  },
+  'NVDA': {
+    symbol: 'NVDA',
+    pair: 'NVDA/USD',
+    name: 'NVIDIA Corp.',
+    price: 125.50,
+    high24h: 128.90,
+    low24h: 122.10,
+    volume24h: '145M Shares',
+    change24h: '+4.25%',
+    type: 'Stocks',
+    unit: 'NVDA',
+    iconColor: 'text-[#76B900] bg-[#76B900]/10'
+  },
+  'MSFT': {
+    symbol: 'MSFT',
+    pair: 'MSFT/USD',
+    name: 'Microsoft Corp.',
+    price: 420.10,
+    high24h: 423.80,
+    low24h: 417.20,
+    volume24h: '22M Shares',
+    change24h: '+0.65%',
+    type: 'Stocks',
+    unit: 'MSFT',
+    iconColor: 'text-[#F25022] bg-[#F25022]/10'
+  },
+  'AMZN': {
+    symbol: 'AMZN',
+    pair: 'AMZN/USD',
+    name: 'Amazon.com Inc.',
+    price: 185.30,
+    high24h: 188.40,
+    low24h: 183.10,
+    volume24h: '35M Shares',
+    change24h: '+1.15%',
+    type: 'Stocks',
+    unit: 'AMZN',
+    iconColor: 'text-[#FF9900] bg-[#FF9900]/10'
+  },
+  'GOOGL': {
+    symbol: 'GOOGL',
+    pair: 'GOOGL/USD',
+    name: 'Alphabet Inc.',
+    price: 175.40,
+    high24h: 177.80,
+    low24h: 174.10,
+    volume24h: '28M Shares',
+    change24h: '-0.32%',
+    type: 'Stocks',
+    unit: 'GOOGL',
+    iconColor: 'text-[#4285F4] bg-[#4285F4]/10'
+  },
+  'META': {
+    symbol: 'META',
+    pair: 'META/USD',
+    name: 'Meta Platforms Inc.',
+    price: 475.20,
+    high24h: 482.50,
+    low24h: 468.90,
+    volume24h: '18M Shares',
+    change24h: '+2.18%',
+    type: 'Stocks',
+    unit: 'META',
+    iconColor: 'text-[#0668E1] bg-[#0668E1]/10'
   }
 };
 
@@ -183,6 +346,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   const [searchQuery, setSearchQuery] = useState('');
   const [tableTab, setTableTab] = useState('positions');
   const [watchlistTab, setWatchlistTab] = useState('All');
+  const [watchlistSearchQuery, setWatchlistSearchQuery] = useState('');
 
   // Search dialog visibility
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -219,22 +383,20 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   const [balance, setBalance] = useState(initialBalance);
 
   // Real-time price states
-  const [prices, setPrices] = useState({
-    BTC: ASSETS.BTC.price,
-    ETH: ASSETS.ETH.price,
-    'EUR/USD': ASSETS['EUR/USD'].price,
-    'GBP/USD': ASSETS['GBP/USD'].price,
-    'XAU/USD': ASSETS['XAU/USD'].price,
-    AAPL: ASSETS.AAPL.price
+  const [prices, setPrices] = useState(() => {
+    const initial = {};
+    Object.keys(ASSETS).forEach(key => {
+      initial[key] = ASSETS[key].price;
+    });
+    return initial;
   });
 
-  const [directions, setDirections] = useState({
-    BTC: 'up',
-    ETH: 'up',
-    'EUR/USD': 'up',
-    'GBP/USD': 'up',
-    'XAU/USD': 'up',
-    AAPL: 'up'
+  const [directions, setDirections] = useState(() => {
+    const initial = {};
+    Object.keys(ASSETS).forEach(key => {
+      initial[key] = 'up';
+    });
+    return initial;
   });
 
   const livePrice = prices[selectedAsset];
@@ -245,32 +407,101 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   const [priceFlash, setPriceFlash] = useState(null); // 'up' | 'down' | null
 
   // Live prices, percents and 24h stats
-  const [changePercents, setChangePercents] = useState({
-    BTC: parseFloat(ASSETS.BTC.change24h),
-    ETH: parseFloat(ASSETS.ETH.change24h),
-    'EUR/USD': parseFloat(ASSETS['EUR/USD'].change24h),
-    'GBP/USD': parseFloat(ASSETS['GBP/USD'].change24h),
-    'XAU/USD': parseFloat(ASSETS['XAU/USD'].change24h),
-    AAPL: parseFloat(ASSETS.AAPL.change24h)
+  const [changePercents, setChangePercents] = useState(() => {
+    const initial = {};
+    Object.keys(ASSETS).forEach(key => {
+      initial[key] = parseFloat(ASSETS[key].change24h);
+    });
+    return initial;
   });
 
-  const [stats, setStats] = useState({
-    BTC: { high24h: ASSETS.BTC.high24h, low24h: ASSETS.BTC.low24h, volume24h: ASSETS.BTC.volume24h },
-    ETH: { high24h: ASSETS.ETH.high24h, low24h: ASSETS.ETH.low24h, volume24h: ASSETS.ETH.volume24h },
-    'EUR/USD': { high24h: ASSETS['EUR/USD'].high24h, low24h: ASSETS['EUR/USD'].low24h, volume24h: ASSETS['EUR/USD'].volume24h },
-    'GBP/USD': { high24h: ASSETS['GBP/USD'].high24h, low24h: ASSETS['GBP/USD'].low24h, volume24h: ASSETS['GBP/USD'].volume24h },
-    'XAU/USD': { high24h: ASSETS['XAU/USD'].high24h, low24h: ASSETS['XAU/USD'].low24h, volume24h: ASSETS['XAU/USD'].volume24h },
-    AAPL: { high24h: ASSETS.AAPL.high24h, low24h: ASSETS.AAPL.low24h, volume24h: ASSETS.AAPL.volume24h }
+  const [stats, setStats] = useState(() => {
+    const initial = {};
+    Object.keys(ASSETS).forEach(key => {
+      initial[key] = { 
+        high24h: ASSETS[key].high24h, 
+        low24h: ASSETS[key].low24h, 
+        volume24h: ASSETS[key].volume24h 
+      };
+    });
+    return initial;
   });
 
   // Dynamic positions calculations from Supabase
   const [positions, setPositions] = useState(initialPositions || []);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isClosingId, setIsClosingId] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Resizable panels states
+  const [leftWidth, setLeftWidth] = useState(220);
+  const [rightWidth, setRightWidth] = useState(325);
+  const [terminalHeight, setTerminalHeight] = useState(210);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
+
+  const startResizeLeft = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftWidth;
+    const doResize = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(180, Math.min(400, startWidth + deltaX));
+      setLeftWidth(newWidth);
+    };
+    const stopResize = () => {
+      document.removeEventListener('mousemove', doResize);
+      document.removeEventListener('mouseup', stopResize);
+    };
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+  };
+
+  const startResizeRight = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightWidth;
+    const doResize = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(260, Math.min(500, startWidth - deltaX));
+      setRightWidth(newWidth);
+    };
+    const stopResize = () => {
+      document.removeEventListener('mousemove', doResize);
+      document.removeEventListener('mouseup', stopResize);
+    };
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+  };
+
+  const startResizeTerminal = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = terminalHeight;
+    const doResize = (moveEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const newHeight = Math.max(120, Math.min(500, startHeight - deltaY));
+      setTerminalHeight(newHeight);
+    };
+    const stopResize = () => {
+      document.removeEventListener('mousemove', doResize);
+      document.removeEventListener('mouseup', stopResize);
+    };
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+  };
 
   // Calculate dynamic P&Ls based on live prices
   const getPositionPnL = (pos) => {
     const currentPrice = prices[pos.symbol] || pos.entry;
-    if (pos.side === 'Buy') {
-      if (['EUR/USD', 'GBP/USD'].includes(pos.symbol)) {
+    if (pos.side?.toLowerCase() === 'buy') {
+      if (FOREX_SYMBOLS.includes(pos.symbol)) {
         return (currentPrice - pos.entry) * 100000 * pos.size;
       }
       if (pos.symbol === 'XAU/USD') {
@@ -278,7 +509,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
       }
       return (currentPrice - pos.entry) * pos.size;
     } else {
-      if (['EUR/USD', 'GBP/USD'].includes(pos.symbol)) {
+      if (FOREX_SYMBOLS.includes(pos.symbol)) {
         return (pos.entry - currentPrice) * 100000 * pos.size;
       }
       if (pos.symbol === 'XAU/USD') {
@@ -310,10 +541,10 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   useEffect(() => {
     const defaultPriceStr = livePrice.toString();
     setLimitPrice(defaultPriceStr);
-    setStopPrice((livePrice * 1.01).toFixed(['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 4 : 2));
+    setStopPrice((livePrice * 1.01).toFixed(FOREX_SYMBOLS.includes(selectedAsset) ? 4 : 2));
     
     const initialVol = parseFloat(vol) || 0;
-    const lotMultiplier = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
+    const lotMultiplier = FOREX_SYMBOLS.includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
     setTotalUSDT((initialVol * livePrice * lotMultiplier).toFixed(2));
   }, [selectedAsset]);
 
@@ -321,7 +552,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   useEffect(() => {
     if (orderSubtype === 'Market') {
       const currentVol = parseFloat(vol) || 0;
-      const lotMultiplier = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
+      const lotMultiplier = FOREX_SYMBOLS.includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
       setTotalUSDT((currentVol * livePrice * lotMultiplier).toFixed(2));
     }
   }, [livePrice, orderSubtype]);
@@ -352,22 +583,26 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
           return next;
         });
 
-        setChangePercents({
-          BTC: data.BTC.change,
-          ETH: data.ETH.change,
-          'EUR/USD': data['EUR/USD'].change,
-          'GBP/USD': data['GBP/USD'].change,
-          'XAU/USD': data['XAU/USD'].change,
-          AAPL: data.AAPL.change
+        setChangePercents(prev => {
+          const next = { ...prev };
+          Object.keys(data).forEach(sym => {
+            if (data[sym]) next[sym] = data[sym].change;
+          });
+          return next;
         });
 
-        setStats({
-          BTC: { high24h: data.BTC.high, low24h: data.BTC.low, volume24h: data.BTC.volume },
-          ETH: { high24h: data.ETH.high, low24h: data.ETH.low, volume24h: data.ETH.volume },
-          'EUR/USD': { high24h: data['EUR/USD'].high, low24h: data['EUR/USD'].low, volume24h: data['EUR/USD'].volume },
-          'GBP/USD': { high24h: data['GBP/USD'].high, low24h: data['GBP/USD'].low, volume24h: data['GBP/USD'].volume },
-          'XAU/USD': { high24h: data['XAU/USD'].high, low24h: data['XAU/USD'].low, volume24h: data['XAU/USD'].volume },
-          AAPL: { high24h: data.AAPL.high, low24h: data.AAPL.low, volume24h: data.AAPL.volume }
+        setStats(prev => {
+          const next = { ...prev };
+          Object.keys(data).forEach(sym => {
+            if (data[sym]) {
+              next[sym] = { 
+                high24h: data[sym].high, 
+                low24h: data[sym].low, 
+                volume24h: data[sym].volume 
+              };
+            }
+          });
+          return next;
         });
       } catch (err) {
         console.error('Failed to fetch live prices:', err);
@@ -389,11 +624,11 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   };
 
   const adjustPrice = (type, increment) => {
-    const step = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 0.0001 : selectedAsset === 'XAU/USD' ? 0.10 : selectedAsset === 'BTC' ? 10 : selectedAsset === 'ETH' ? 0.50 : 0.50;
+    const step = FOREX_SYMBOLS.includes(selectedAsset) ? 0.0001 : selectedAsset === 'XAU/USD' ? 0.10 : selectedAsset === 'BTC' ? 10 : selectedAsset === 'ETH' ? 0.50 : 0.50;
     const val = type === 'limit' ? limitPrice : stopPrice;
     const current = parseFloat(val) || livePrice;
     const next = increment ? current + step : Math.max(0.0001, current - step);
-    const formatted = next.toFixed(['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 4 : 2);
+    const formatted = next.toFixed(FOREX_SYMBOLS.includes(selectedAsset) ? 4 : 2);
     if (type === 'limit') {
       setLimitPrice(formatted);
       syncTotalFromVol(parseFloat(vol), next);
@@ -403,23 +638,23 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   };
 
   const adjustTp = (increment) => {
-    const step = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 0.0001 : selectedAsset === 'XAU/USD' ? 0.10 : selectedAsset === 'BTC' ? 10 : selectedAsset === 'ETH' ? 0.50 : 0.50;
+    const step = FOREX_SYMBOLS.includes(selectedAsset) ? 0.0001 : selectedAsset === 'XAU/USD' ? 0.10 : selectedAsset === 'BTC' ? 10 : selectedAsset === 'ETH' ? 0.50 : 0.50;
     const current = parseFloat(tpPrice) || livePrice;
     const next = increment ? current + step : Math.max(0, current - step);
-    setTpPrice(next.toFixed(['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 4 : 2));
+    setTpPrice(next.toFixed(FOREX_SYMBOLS.includes(selectedAsset) ? 4 : 2));
   };
 
   const adjustSl = (increment) => {
-    const step = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 0.0001 : selectedAsset === 'XAU/USD' ? 0.10 : selectedAsset === 'BTC' ? 10 : selectedAsset === 'ETH' ? 0.50 : 0.50;
+    const step = FOREX_SYMBOLS.includes(selectedAsset) ? 0.0001 : selectedAsset === 'XAU/USD' ? 0.10 : selectedAsset === 'BTC' ? 10 : selectedAsset === 'ETH' ? 0.50 : 0.50;
     const current = parseFloat(slPrice) || livePrice;
     const next = increment ? current + step : Math.max(0, current - step);
-    setSlPrice(next.toFixed(['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 4 : 2));
+    setSlPrice(next.toFixed(FOREX_SYMBOLS.includes(selectedAsset) ? 4 : 2));
   };
 
 
   // Sync Total USDT from Vol quantity
   const syncTotalFromVol = (quantity, rate) => {
-    const lotMultiplier = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
+    const lotMultiplier = FOREX_SYMBOLS.includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
     const priceVal = orderSubtype === 'Market' ? livePrice : (parseFloat(rate) || livePrice);
     const total = quantity * priceVal * lotMultiplier;
     setTotalUSDT(total.toFixed(2));
@@ -428,7 +663,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
 
   // Sync Vol quantity from Total USDT
   const syncVolFromTotal = (totalAmount, rate) => {
-    const lotMultiplier = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
+    const lotMultiplier = FOREX_SYMBOLS.includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
     const priceVal = orderSubtype === 'Market' ? livePrice : (parseFloat(rate) || livePrice);
     const quantity = totalAmount / (priceVal * lotMultiplier);
     setVol(quantity.toFixed(3));
@@ -472,7 +707,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
 
   // Convert volume lots to USD Order Value
   const getOrderValueUSD = () => {
-    const lotMultiplier = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
+    const lotMultiplier = FOREX_SYMBOLS.includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
     const numVol = parseFloat(vol) || 0;
     return numVol * livePrice * lotMultiplier;
   };
@@ -526,17 +761,21 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   }, [tableTab]);
 
   const handlePlaceOrder = async () => {
-    const lotMultiplier = ['EUR/USD', 'GBP/USD'].includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
+    if (isPlacingOrder) return;
+    setIsPlacingOrder(true);
+    const lotMultiplier = FOREX_SYMBOLS.includes(selectedAsset) ? 100000 : selectedAsset === 'XAU/USD' ? 100 : 1;
     const entryPrice = orderSubtype === 'Market' ? livePrice : parseFloat(limitPrice);
     const fullOrderValue = (parseFloat(vol) || 0) * entryPrice * lotMultiplier;
     const marginRequired = fullOrderValue / leverage;
 
     if (parseFloat(vol) <= 0 || isNaN(parseFloat(vol))) {
       setErrorMsg('Please enter a valid volume.');
+      setIsPlacingOrder(false);
       return;
     }
     if (marginRequired > balance) {
       setErrorMsg('Required margin exceeds available balance.');
+      setIsPlacingOrder(false);
       return;
     }
 
@@ -575,11 +814,15 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
       console.error('Failed to place trade order:', err);
       setErrorMsg('Failed to execute trade.');
       showToast('Failed to execute trade.', 'info');
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
   // Close open position
   const handleClosePosition = async (tradeId, symbol, entryPrice, autoCloseReason = null) => {
+    if (isClosingId) return;
+    setIsClosingId(tradeId);
     const exitPrice = prices[symbol] || entryPrice;
     try {
       const response = await fetch('/api/trades', {
@@ -608,6 +851,8 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
     } catch (err) {
       console.error('Failed to close position:', err);
       showToast('Failed to close position.', 'info');
+    } finally {
+      setIsClosingId(null);
     }
   };
 
@@ -678,7 +923,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   };
 
   const formatAssetPrice = (val, sym = selectedAsset) => {
-    return ['EUR/USD', 'GBP/USD'].includes(sym) 
+    return FOREX_SYMBOLS.includes(sym) 
       ? val.toFixed(4) 
       : val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
@@ -764,23 +1009,60 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
   }, [scriptLoaded, selectedAsset, timeframe, chartType]);
 
   const renderWatchlist = () => {
+    const filteredAssets = Object.values(ASSETS).filter(item => {
+      // Tab Category Filter
+      if (watchlistTab === 'Forex' && item.type !== 'Forex') return false;
+      if (watchlistTab === 'Crypto' && item.type !== 'Crypto') return false;
+      if (watchlistTab === 'Stocks' && item.type !== 'Stocks') return false;
+
+      // Watchlist search text filter
+      if (watchlistSearchQuery) {
+        const q = watchlistSearchQuery.toLowerCase().trim();
+        const matchesSymbol = item.symbol.toLowerCase().includes(q);
+        const matchesName = item.name.toLowerCase().includes(q);
+        return matchesSymbol || matchesName;
+      }
+      return true;
+    });
+
     return (
-      <div className="flex flex-col h-full overflow-hidden select-none bg-white">
-        <div className="p-2 bg-[#FAFAFA] border-b border-gray-100 flex items-center justify-between shrink-0 select-none">
-          <span className="font-bold text-[10px] text-gray-500 uppercase tracking-wider">Watchlist</span>
-          <div className="text-[10px] font-bold flex gap-2 text-gray-400">
+      <div className="flex flex-col h-full overflow-hidden select-none bg-white font-sans">
+        {/* Watchlist Main Header */}
+        <div className="px-3.5 py-3 bg-[#FAFAFA] border-b border-gray-100 flex flex-col gap-2.5 shrink-0 select-none">
+          <span className="font-extrabold text-xs text-gray-900 uppercase tracking-wider">Watchlist</span>
+          <div className="text-[9.5px] font-bold flex gap-3.5 text-gray-400 pt-1.5 border-t border-gray-100 select-none">
             {['All', 'Forex', 'Stocks', 'Crypto'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setWatchlistTab(tab)}
                 className={`cursor-pointer transition-all uppercase tracking-wider ${
-                  watchlistTab === tab ? 'text-[#2563EB] font-bold' : 'hover:text-gray-600'
+                  watchlistTab === tab ? 'text-[#2563EB] font-extrabold' : 'hover:text-gray-600'
                 }`}
               >
                 {tab}
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Watchlist Search Bar input */}
+        <div className="px-3.5 py-1.5 border-b border-gray-100 bg-[#FAFAFA]/40 shrink-0 flex items-center gap-1.5 relative select-none">
+          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search symbol or name..."
+            value={watchlistSearchQuery}
+            onChange={(e) => setWatchlistSearchQuery(e.target.value)}
+            className="w-full bg-transparent border-none text-[10.5px] font-semibold text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-0 p-0"
+          />
+          {watchlistSearchQuery && (
+            <button 
+              onClick={() => setWatchlistSearchQuery('')}
+              className="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors p-0.5 cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
         </div>
 
         {/* Watchlist Table */}
@@ -794,14 +1076,14 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
               </tr>
             </thead>
             <tbody>
-              {Object.values(ASSETS)
-                .filter(item => {
-                  if (watchlistTab === 'Forex' && item.type !== 'Forex') return false;
-                  if (watchlistTab === 'Crypto' && item.type !== 'Crypto') return false;
-                  if (watchlistTab === 'Stocks' && item.type !== 'Stocks') return false;
-                  return true;
-                })
-                .map((item) => {
+              {filteredAssets.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-8 text-center text-gray-400 font-semibold text-[10px]">
+                    No assets match your search
+                  </td>
+                </tr>
+              ) : (
+                filteredAssets.map((item) => {
                   const buyPrice = prices[item.symbol];
                   const changePct = getChangePercent(item.symbol);
                   const isUp = changePct >= 0;
@@ -828,7 +1110,8 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                       </td>
                     </tr>
                   );
-                })}
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -1180,13 +1463,13 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
           <button
             type="button"
             onClick={handlePlaceOrder}
-            disabled={!!errorMsg || !totalUSDT || parseFloat(totalUSDT) <= 0}
+            disabled={isPlacingOrder || !!errorMsg || !totalUSDT || parseFloat(totalUSDT) <= 0}
             className="w-full text-white py-2 rounded-md font-bold mb-2.5 transition-colors cursor-pointer text-xs disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider min-h-[44px] flex items-center justify-center animate-fade-in"
             style={{
               backgroundColor: orderType === 'buy' ? '#2563EB' : '#f23645'
             }}
           >
-            {orderType === 'buy' ? `Buy ${selectedAsset}` : `Sell ${selectedAsset}`}
+            {isPlacingOrder ? 'Executing...' : (orderType === 'buy' ? `Buy ${selectedAsset}` : `Sell ${selectedAsset}`)}
           </button>
           
           {/* Account/Margin details */}
@@ -1464,9 +1747,43 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
             <button title="Support" onClick={() => showToast('Live support chat coming soon!', 'info')} className="p-1 text-gray-400 hover:text-gray-900 rounded-md hover:bg-gray-100 cursor-pointer">
               <HelpCircle className="w-4 h-4" />
             </button>
+
+            {/* Mobile hamburger menu button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Mobile Nav Dropdown */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-b border-[#E0E3EB] bg-white px-6 py-4 flex flex-col gap-4 shadow-lg z-50 absolute left-0 right-0 top-12 select-none">
+          <nav className="flex flex-col gap-3">
+            {[
+              { label: 'Dashboard', href: '/dashboard' },
+              { label: 'Trade', href: '/trade', active: true },
+              { label: 'History', href: '/history' },
+              { label: 'Leaderboard', href: '/leaderboard' },
+              { label: 'Competitions', href: '/competitions' },
+            ].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`text-xs font-semibold px-3 py-2 rounded-lg transition-colors ${
+                  link.active ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
 
       {/* TOP TICKER STRIP */}
       <div className="bg-white border-b border-[#E0E3EB] h-7 overflow-hidden relative flex items-center w-full select-none shrink-0">
@@ -1484,7 +1801,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
               >
                 <span className="font-bold text-[#111111]">{item.symbol}</span>
                 <span className="text-gray-500 font-semibold tabular-nums">
-                  {['EUR/USD', 'GBP/USD'].includes(item.symbol) 
+                  {FOREX_SYMBOLS.includes(item.symbol) 
                     ? currentPrice.toFixed(4) 
                     : currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })
                   }
@@ -1591,15 +1908,21 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
         </aside>
 
         {/* LEFT Column: Watchlist Panel */}
-        <aside className="hidden lg:flex w-[16%] min-w-[200px] max-w-[260px] bg-white border-r border-[#E0E3EB] flex-col overflow-hidden h-full shrink-0">
+        <aside style={{ width: `${leftWidth}px` }} className="hidden lg:flex bg-white flex-col overflow-hidden h-full shrink-0">
           {renderWatchlist()}
         </aside>
+
+        {/* Left Resize Handle */}
+        <div 
+          onMouseDown={startResizeLeft}
+          className="hidden lg:block w-[4px] hover:bg-[#2563EB]/40 active:bg-[#2563EB] bg-transparent border-r border-[#E0E3EB] hover:border-transparent cursor-col-resize transition-all duration-150 shrink-0 select-none z-10"
+        />
 
         {/* Center and Left Work Area (Chart & Bottom Terminal) */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white">
           
           {/* Chart Section */}
-          <div className="flex-grow flex flex-col overflow-hidden min-h-0 relative">
+          <div className="h-[420px] lg:h-0 lg:flex-grow flex flex-col overflow-hidden relative shrink-0 lg:min-h-0">
             
             {/* Chart Top Header (TradingView Style) */}
             <div className="h-11 border-b border-[#E0E3EB] bg-white flex items-center justify-between px-3 shrink-0 select-none">
@@ -1715,8 +2038,14 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
             <div ref={chartContainerRef} className="flex-grow w-full h-full bg-white relative" />
           </div>
 
+          {/* Terminal Resize Handle */}
+          <div 
+            onMouseDown={startResizeTerminal}
+            className="h-[5px] hover:bg-[#2563EB]/40 active:bg-[#2563EB] bg-[#FAFAFA] border-t border-b border-[#E0E3EB] hover:border-transparent cursor-row-resize transition-all duration-150 shrink-0 select-none z-10"
+          />
+
           {/* Positions / Terminal Section */}
-          <div className="h-[210px] bg-white border-t border-[#E0E3EB] overflow-hidden flex flex-col shrink-0">
+          <div style={{ height: `${terminalHeight}px` }} className="bg-white overflow-hidden flex flex-col shrink-0">
             {/* Header Tabs */}
             <div className="text-[11px] font-bold border-b border-gray-100 bg-[#FAFAFA] text-gray-400 shrink-0 flex justify-between items-center px-4 py-1">
               <div className="flex gap-4 select-none">
@@ -1773,17 +2102,17 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                             </td>
                             <td className="px-3 py-1.5 font-mono tabular-nums">{pos.size.toFixed(2)}</td>
                             <td className="px-3 py-1.5 font-mono tabular-nums">
-                              {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.entry.toFixed(4) : `$${pos.entry.toLocaleString()}`}
+                              {FOREX_SYMBOLS.includes(pos.symbol) ? pos.entry.toFixed(4) : `$${pos.entry.toLocaleString()}`}
                             </td>
                             <td className="px-3 py-1.5 font-mono tabular-nums text-gray-500">
                               {(() => {
-                                const tpText = pos.take_profit ? (['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.take_profit.toFixed(4) : pos.take_profit.toLocaleString()) : '--';
-                                const slText = pos.stop_loss ? (['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.stop_loss.toFixed(4) : pos.stop_loss.toLocaleString()) : '--';
+                                const tpText = pos.take_profit ? (FOREX_SYMBOLS.includes(pos.symbol) ? pos.take_profit.toFixed(4) : pos.take_profit.toLocaleString()) : '--';
+                                const slText = pos.stop_loss ? (FOREX_SYMBOLS.includes(pos.symbol) ? pos.stop_loss.toFixed(4) : pos.stop_loss.toLocaleString()) : '--';
                                 return `${tpText} / ${slText}`;
                               })()}
                             </td>
                             <td className="px-3 py-1.5 font-mono tabular-nums text-gray-900">
-                              {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? currentVal.toFixed(4) : `$${currentVal.toLocaleString()}`}
+                              {FOREX_SYMBOLS.includes(pos.symbol) ? currentVal.toFixed(4) : `$${currentVal.toLocaleString()}`}
                             </td>
                             <td className={`px-3 py-1.5 text-right font-mono font-bold tabular-nums ${isUp ? 'text-[#089981]' : 'text-[#f23645]'}`}>
                               {isUp ? '+' : ''}{pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
@@ -1806,10 +2135,11 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                                 </button>
                                 <button
                                   type="button"
+                                  disabled={isClosingId !== null}
                                   onClick={() => handleClosePosition(pos.id, pos.symbol, pos.entry)}
-                                  className="px-2 py-0.5 bg-black text-white hover:bg-gray-800 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer"
+                                  className="px-2 py-0.5 bg-black text-white hover:bg-gray-800 rounded text-[9px] font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  Close
+                                  {isClosingId === pos.id ? 'Closing...' : 'Close'}
                                 </button>
                               </div>
                             </td>
@@ -1864,10 +2194,10 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                             </td>
                             <td className="px-3 py-1.5 font-mono tabular-nums">{pos.size?.toFixed(2)}</td>
                             <td className="px-3 py-1.5 font-mono tabular-nums">
-                              {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.entry.toFixed(4) : `$${pos.entry.toLocaleString()}`}
+                              {FOREX_SYMBOLS.includes(pos.symbol) ? pos.entry.toFixed(4) : `$${pos.entry.toLocaleString()}`}
                             </td>
                             <td className="px-3 py-1.5 font-mono tabular-nums text-gray-900">
-                              {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.exit?.toFixed(4) : `$${pos.exit?.toLocaleString()}`}
+                              {FOREX_SYMBOLS.includes(pos.symbol) ? pos.exit?.toFixed(4) : `$${pos.exit?.toLocaleString()}`}
                             </td>
                             <td className={`px-3 py-1.5 text-right font-mono font-bold tabular-nums ${isUp ? 'text-[#089981]' : 'text-[#f23645]'}`}>
                               {isUp ? '+' : ''}{pos.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
@@ -1900,79 +2230,16 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
           </div>
         </main>
 
-        {/* Right Sidebar (Watchlist & Order Ticket Panel) */}
-        <aside className="w-[325px] bg-white border-l border-[#E0E3EB] flex flex-col divide-y divide-[#E0E3EB] shrink-0 overflow-hidden h-full">
+        {/* Right Resize Handle */}
+        <div 
+          onMouseDown={startResizeRight}
+          className="hidden lg:block w-[4px] hover:bg-[#2563EB]/40 active:bg-[#2563EB] bg-transparent border-l border-[#E0E3EB] hover:border-transparent cursor-col-resize transition-all duration-150 shrink-0 select-none z-10"
+        />
+
+        {/* Right Sidebar (Order Ticket Panel only) */}
+        <aside style={{ width: isDesktop ? `${rightWidth}px` : '100%' }} className="w-full lg:w-auto bg-white border-t lg:border-t-0 flex flex-col shrink-0 overflow-y-auto lg:overflow-hidden h-auto lg:h-full">
           
-          {/* Watchlist Panel (Top ~38%) */}
-          <div className="h-[38%] flex flex-col overflow-hidden min-h-[220px]">
-            <div className="p-2 bg-[#FAFAFA] border-b border-gray-100 flex items-center justify-between shrink-0 select-none">
-              <span className="font-bold text-[10px] text-gray-500 uppercase tracking-wider">Watchlist</span>
-              <div className="text-[10px] font-bold flex gap-2 text-gray-400">
-                {['All', 'Forex', 'Stocks', 'Crypto'].map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setWatchlistTab(tab)}
-                    className={`cursor-pointer transition-all uppercase tracking-wider ${
-                      watchlistTab === tab ? 'text-[#2563EB] font-bold' : 'hover:text-gray-600'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Watchlist Table */}
-            <div className="flex-grow overflow-y-auto px-2">
-              <table className="w-full text-left border-collapse text-[10px] font-sans">
-                <thead>
-                  <tr className="border-b border-gray-100 text-[#9CA3AF] font-bold uppercase text-[7.5px] tracking-wider sticky top-0 bg-white z-10 py-1">
-                    <th className="py-1">Symbol</th>
-                    <th className="py-1 text-right">Last</th>
-                    <th className="py-1 text-right">% Chg</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.values(ASSETS)
-                    .filter(item => {
-                      if (watchlistTab === 'Forex' && item.type !== 'Forex') return false;
-                      if (watchlistTab === 'Crypto' && item.type !== 'Crypto') return false;
-                      if (watchlistTab === 'Stocks' && item.type !== 'Stocks') return false;
-                      return true;
-                    })
-                    .map((item) => {
-                      const buyPrice = prices[item.symbol];
-                      const changePct = getChangePercent(item.symbol);
-                      const isUp = changePct >= 0;
-                      const isSelected = selectedAsset === item.symbol;
-
-                      return (
-                        <tr
-                          key={item.symbol}
-                          onClick={() => handleAssetChange(item.symbol)}
-                          className={`cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                            isSelected ? 'bg-[#2563EB]/5 font-bold border-l-2 border-l-[#2563EB]' : ''
-                          }`}
-                        >
-                          <td className="py-1.5 px-1 font-bold text-gray-900">
-                            <div>{item.symbol}/USDT</div>
-                          </td>
-                          <td className="py-1.5 text-right font-mono text-gray-700 tabular-nums">
-                            {formatAssetPrice(buyPrice, item.symbol)}
-                          </td>
-                          <td className={`py-1.5 text-right font-mono font-bold tabular-nums ${
-                            isUp ? 'text-[#089981]' : 'text-[#f23645]'
-                          }`}>
-                            {isUp ? '+' : ''}{changePct.toFixed(2)}%
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          {/* Order Placement Panel (Bottom ~62%) */}
+          {/* Order Placement Panel */}
           {(() => {
             const buyPrice = livePrice;
             const sellPrice = buyPrice * 0.9999;
@@ -1992,7 +2259,7 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
             };
 
             return (
-              <div className="h-[62%] flex flex-col overflow-y-auto p-3.5 justify-between bg-white text-gray-900 border-t border-[#E0E3EB]">
+              <div className="h-full w-full flex flex-col overflow-y-auto p-3.5 justify-between bg-white text-gray-900">
                 <div className="flex flex-col gap-3">
                   
                   {/* HEADER ROW */}
@@ -2313,13 +2580,13 @@ export default function TradeClientPage({ userName, initialBalance, initialPosit
                   <button
                     type="button"
                     onClick={handlePlaceOrder}
-                    disabled={!!errorMsg || !totalUSDT || parseFloat(totalUSDT) <= 0}
+                    disabled={isPlacingOrder || !!errorMsg || !totalUSDT || parseFloat(totalUSDT) <= 0}
                     className="w-full text-white py-2 rounded-md font-bold mb-3 transition-colors cursor-pointer text-xs disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
                     style={{
                       backgroundColor: orderType === 'buy' ? '#2563EB' : '#f23645'
                     }}
                   >
-                    {orderType === 'buy' ? `Buy ${selectedAsset}` : `Sell ${selectedAsset}`}
+                    {isPlacingOrder ? 'Executing...' : (orderType === 'buy' ? `Buy ${selectedAsset}` : `Sell ${selectedAsset}`)}
                   </button>
                   
                   {/* Account/Margin details */}

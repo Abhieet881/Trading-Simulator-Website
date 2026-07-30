@@ -35,34 +35,51 @@ export default async function HistoryPage() {
 
   const displayName = dbUser?.name || user.user_metadata?.name || 'Trader';
 
-  // 3. Fetch all closed trades from public.trades (with fallback support)
-  let closedTrades = [];
+  // Determine if using local fallback by checking if wallet exists in Supabase
+  let useLocalFallback = false;
   try {
-    const { data: dbTrades, error: dbTradesError } = await supabase
-      .from('trades')
-      .select('*')
+    const { data: dbWallet, error: dbWalletError } = await supabase
+      .from('wallets')
+      .select('id')
       .eq('user_id', user.id)
-      .eq('status', 'closed')
-      .order('closed_at', { ascending: false });
-
-    if (dbTradesError) {
-      if (dbTradesError.message?.includes('schema cache') || dbTradesError.message?.includes('does not exist')) {
-        const fs = require('fs');
-        const path = require('path');
-        const localDbPath = path.join(process.cwd(), 'local_db.json');
-        if (fs.existsSync(localDbPath)) {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          closedTrades = db.trades.filter(t => t.user_id === user.id && t.status === 'closed');
-          closedTrades.sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at));
-        }
-      } else {
-        throw dbTradesError;
-      }
-    } else if (dbTrades) {
-      closedTrades = dbTrades;
+      .single();
+    if (dbWalletError || !dbWallet) {
+      useLocalFallback = true;
     }
-  } catch (err) {
-    console.error('Failed to fetch trades in history page load:', err);
+  } catch (e) {
+    useLocalFallback = true;
+  }
+
+  // 3. Fetch all closed trades (with fallback support)
+  let closedTrades = [];
+  if (useLocalFallback) {
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        closedTrades = db.trades.filter(t => t.user_id === user.id && t.status === 'closed');
+        closedTrades.sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at));
+      } catch (e) {}
+    }
+  } else {
+    try {
+      const { data: dbTrades, error: dbTradesError } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false });
+
+      if (dbTradesError) {
+        throw dbTradesError;
+      } else if (dbTrades) {
+        closedTrades = dbTrades;
+      }
+    } catch (err) {
+      console.error('Failed to fetch trades in history page load:', err);
+    }
   }
 
   // Map to unified format

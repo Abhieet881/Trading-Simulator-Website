@@ -43,6 +43,7 @@ export default async function DashboardPage() {
   let balance = 0.00;
   let balanceConfigured = false;
   let initialBalance = 0.00;
+  let useLocalFallback = false;
   try {
     const { data: dbWallet, error: dbWalletError } = await supabase
       .from('wallets')
@@ -50,27 +51,25 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .single();
 
-    if (dbWalletError) {
-      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
-        const fs = require('fs');
-        const path = require('path');
-        const localDbPath = path.join(process.cwd(), 'local_db.json');
-        if (fs.existsSync(localDbPath)) {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-          balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
-          initialBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 0.00;
-        }
-      } else {
-        throw dbWalletError;
+    if (dbWalletError || !dbWallet) {
+      useLocalFallback = true;
+      const fs = require('fs');
+      const path = require('path');
+      const localDbPath = path.join(process.cwd(), 'local_db.json');
+      if (fs.existsSync(localDbPath)) {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
+        initialBalance = db.initial_balances?.[user.id] !== undefined ? db.initial_balances[user.id] : 0.00;
       }
-    } else if (dbWallet) {
+    } else {
       balance = parseFloat(dbWallet.virtual_balance || 0);
       balanceConfigured = dbWallet.balance_configured || false;
       initialBalance = parseFloat(dbWallet.initial_balance || 0);
     }
   } catch (err) {
     console.error('Failed to fetch wallet for dashboard, using fallback:', err);
+    useLocalFallback = true;
     const fs = require('fs');
     const path = require('path');
     const localDbPath = path.join(process.cwd(), 'local_db.json');
@@ -86,49 +85,53 @@ export default async function DashboardPage() {
     }
   }
 
-  // 4. Fetch trades from public.trades table
+  // 4. Fetch trades (with fallback support)
   let openPositionsCount = 0;
   let totalClosedPnL = 0.00;
   let hasTrades = false;
   let recentTrades = [];
 
-  try {
-    const { data: dbTrades, error: dbTradesError } = await supabase
-      .from('trades')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (dbTradesError) {
-      if (dbTradesError.message?.includes('schema cache') || dbTradesError.message?.includes('does not exist')) {
-        const fs = require('fs');
-        const path = require('path');
-        const localDbPath = path.join(process.cwd(), 'local_db.json');
-        if (fs.existsSync(localDbPath)) {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          const localTrades = db.trades.filter(t => t.user_id === user.id);
+  if (useLocalFallback) {
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        const localTrades = db.trades.filter(t => t.user_id === user.id);
+        
+        if (localTrades.length > 0) {
+          hasTrades = true;
+          openPositionsCount = localTrades.filter(t => t.status === 'open').length;
+          totalClosedPnL = localTrades.filter(t => t.status === 'closed').reduce((sum, t) => sum + parseFloat(t.pnl || 0), 0);
           
-          if (localTrades.length > 0) {
-            hasTrades = true;
-            openPositionsCount = localTrades.filter(t => t.status === 'open').length;
-            totalClosedPnL = localTrades.filter(t => t.status === 'closed').reduce((sum, t) => sum + parseFloat(t.pnl || 0), 0);
-            
-            // Sort recent trades
-            const sortedLocalTrades = [...localTrades].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            recentTrades = sortedLocalTrades.slice(0, 5);
-          }
+          // Sort recent trades
+          const sortedLocalTrades = [...localTrades].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          recentTrades = sortedLocalTrades.slice(0, 5);
         }
-      } else {
-        throw dbTradesError;
+      } catch (e) {
+        console.error(e);
       }
-    } else if (dbTrades && dbTrades.length > 0) {
-      hasTrades = true;
-      openPositionsCount = dbTrades.filter(t => t.status === 'open').length;
-      totalClosedPnL = dbTrades.filter(t => t.status === 'closed').reduce((sum, t) => sum + parseFloat(t.pnl || 0), 0);
-      recentTrades = dbTrades.slice(0, 5); // Take last 5 trades
     }
-  } catch (err) {
-    console.error('Failed to fetch trades for dashboard:', err);
+  } else {
+    try {
+      const { data: dbTrades, error: dbTradesError } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (dbTradesError) {
+        throw dbTradesError;
+      } else if (dbTrades && dbTrades.length > 0) {
+        hasTrades = true;
+        openPositionsCount = dbTrades.filter(t => t.status === 'open').length;
+        totalClosedPnL = dbTrades.filter(t => t.status === 'closed').reduce((sum, t) => sum + parseFloat(t.pnl || 0), 0);
+        recentTrades = dbTrades.slice(0, 5); // Take last 5 trades
+      }
+    } catch (err) {
+      console.error('Failed to fetch trades for dashboard:', err);
+    }
   }
 
   const pnlPercent = balance > 0 ? (totalClosedPnL / balance) * 100 : 0.00;
@@ -289,7 +292,7 @@ export default async function DashboardPage() {
                             {t.side?.charAt(0).toUpperCase() + t.side?.slice(1)}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-mono tabular-nums text-right">{parseFloat(t.size).toFixed(2)}</td>
+                        <td className="py-3 px-3 font-mono tabular-nums text-right">{parseFloat(t.quantity || t.size || 0).toFixed(2)}</td>
                         <td className="py-3 px-3 font-mono tabular-nums text-right">
                           ${parseFloat(t.entry_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>

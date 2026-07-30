@@ -102,7 +102,7 @@ export default function Home() {
           timeVisible: true,
           secondsVisible: false,
         },
-        width: chartContainerRef.current.clientWidth,
+        width: chartContainerRef.current.clientWidth || 350,
         height: 240,
       });
 
@@ -178,7 +178,9 @@ export default function Home() {
       const resizeObserver = new ResizeObserver((entries) => {
         if (entries.length === 0 || !chart) return;
         const { width } = entries[0].contentRect;
-        chart.resize(width, 240);
+        if (width > 0) {
+          chart.resize(width, 240);
+        }
       });
       resizeObserver.observe(chartContainerRef.current);
 

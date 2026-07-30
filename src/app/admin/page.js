@@ -14,7 +14,7 @@ export default async function AdminPage() {
     redirect('/login');
   }
 
-  // 2. Resolve admin privileges
+  const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
   let isAdmin = false;
   try {
     const { data: dbUser, error: dbUserError } = await supabase
@@ -23,15 +23,10 @@ export default async function AdminPage() {
       .eq('id', user.id)
       .single();
 
-    if (dbUser) {
-      isAdmin = dbUser.is_admin;
-    } else {
-      // Fallback check for initial setup or development environment
-      isAdmin = user.email === 'patilabhijeet409@gmail.com' || user.email === 'abhieet881@gmail.com';
-    }
+    isAdmin = dbUser?.is_admin || ADMIN_EMAILS.includes(user.email);
   } catch (err) {
     console.error('Admin privilege check failed, checking fallback:', err);
-    isAdmin = user.email === 'patilabhijeet409@gmail.com' || user.email === 'abhieet881@gmail.com';
+    isAdmin = ADMIN_EMAILS.includes(user.email);
   }
 
   if (!isAdmin) {

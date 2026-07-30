@@ -21,13 +21,8 @@ export async function PUT(request) {
       .eq('id', user.id)
       .single();
 
-    let isAdmin = false;
-    if (callerUser) {
-      isAdmin = callerUser.is_admin;
-    } else {
-      // Fallback: Check developer emails
-      isAdmin = user.email === 'patilabhijeet409@gmail.com' || user.email === 'abhieet881@gmail.com';
-    }
+    const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
+    let isAdmin = callerUser?.is_admin || ADMIN_EMAILS.includes(user.email);
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -125,10 +120,8 @@ export async function DELETE(request) {
       .eq('id', user.id)
       .single();
 
-    let isAdmin = callerUser?.is_admin;
-    if (!callerUser) {
-      isAdmin = user.email === 'patilabhijeet409@gmail.com' || user.email === 'abhieet881@gmail.com';
-    }
+    const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
+    let isAdmin = callerUser?.is_admin || ADMIN_EMAILS.includes(user.email);
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

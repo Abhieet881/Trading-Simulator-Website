@@ -30,6 +30,7 @@ export default async function TradePage() {
   // 3. Fetch user wallet balance
   let balance = 0.00;
   let balanceConfigured = false;
+  let useLocalFallback = false;
   try {
     const { data: dbWallet, error: dbWalletError } = await supabase
       .from('wallets')
@@ -37,25 +38,23 @@ export default async function TradePage() {
       .eq('user_id', user.id)
       .single();
 
-    if (dbWalletError) {
-      if (dbWalletError.message?.includes('schema cache') || dbWalletError.message?.includes('does not exist') || dbWalletError.message?.includes('column')) {
-        const fs = require('fs');
-        const path = require('path');
-        const localDbPath = path.join(process.cwd(), 'local_db.json');
-        if (fs.existsSync(localDbPath)) {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
-          balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
-        }
-      } else {
-        throw dbWalletError;
+    if (dbWalletError || !dbWallet) {
+      useLocalFallback = true;
+      const fs = require('fs');
+      const path = require('path');
+      const localDbPath = path.join(process.cwd(), 'local_db.json');
+      if (fs.existsSync(localDbPath)) {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        balance = db.wallets[user.id] !== undefined ? db.wallets[user.id] : 0.00;
+        balanceConfigured = db.wallets_configured?.[user.id] !== undefined ? db.wallets_configured[user.id] : false;
       }
-    } else if (dbWallet) {
+    } else {
       balance = parseFloat(dbWallet.virtual_balance || 0);
       balanceConfigured = dbWallet.balance_configured || false;
     }
   } catch (err) {
     console.error('Failed to fetch wallet from Supabase, using default:', err);
+    useLocalFallback = true;
     const fs = require('fs');
     const path = require('path');
     const localDbPath = path.join(process.cwd(), 'local_db.json');
@@ -73,55 +72,57 @@ export default async function TradePage() {
     redirect('/dashboard');
   }
 
-  // 4. Fetch user's active positions from Supabase
+  // 4. Fetch user's active positions (with fallback support)
   let positions = [];
-  try {
-    const { data: dbPositions, error: dbPosError } = await supabase
-      .from('trades')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('status', 'open');
-
-    if (dbPosError) {
-      if (dbPosError.message?.includes('schema cache') || dbPosError.message?.includes('does not exist')) {
-        const fs = require('fs');
-        const path = require('path');
-        const localDbPath = path.join(process.cwd(), 'local_db.json');
-        if (fs.existsSync(localDbPath)) {
-          const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
-          const localPositions = db.trades.filter(t => t.user_id === user.id && t.status === 'open');
-          positions = localPositions.map(pos => ({
-            id: pos.id,
-            symbol: pos.symbol,
-            side: pos.side,
-            entry: parseFloat(pos.entry_price),
-            size: parseFloat(pos.quantity),
-            usd_amount: parseFloat(pos.usd_amount || 0),
-            swap: 0.00,
-            time: new Date(pos.opened_at).toLocaleString(),
-            take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
-            stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
-          }));
-        }
-      } else {
-        throw dbPosError;
-      }
-    } else if (dbPositions) {
-      positions = dbPositions.map(pos => ({
-        id: pos.id,
-        symbol: pos.symbol,
-        side: pos.side,
-        entry: parseFloat(pos.entry_price),
-        size: parseFloat(pos.size || pos.quantity),
-        usd_amount: parseFloat(pos.usd_amount || 0),
-        swap: 0.00,
-        time: new Date(pos.created_at).toLocaleString(),
-        take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
-        stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
-      }));
+  if (useLocalFallback) {
+    const fs = require('fs');
+    const path = require('path');
+    const localDbPath = path.join(process.cwd(), 'local_db.json');
+    if (fs.existsSync(localDbPath)) {
+      try {
+        const db = JSON.parse(fs.readFileSync(localDbPath, 'utf8'));
+        const localPositions = db.trades.filter(t => t.user_id === user.id && t.status === 'open');
+        positions = localPositions.map(pos => ({
+          id: pos.id,
+          symbol: pos.symbol,
+          side: pos.side,
+          entry: parseFloat(pos.entry_price),
+          size: parseFloat(pos.quantity),
+          usd_amount: parseFloat(pos.usd_amount || 0),
+          swap: 0.00,
+          time: new Date(pos.opened_at).toLocaleString(),
+          take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
+          stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
+        }));
+      } catch (e) {}
     }
-  } catch (err) {
-    console.error('Failed to fetch trades from Supabase:', err);
+  } else {
+    try {
+      const { data: dbPositions, error: dbPosError } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'open');
+
+      if (dbPosError) {
+        throw dbPosError;
+      } else if (dbPositions) {
+        positions = dbPositions.map(pos => ({
+          id: pos.id,
+          symbol: pos.symbol,
+          side: pos.side,
+          entry: parseFloat(pos.entry_price),
+          size: parseFloat(pos.quantity || pos.size || 0),
+          usd_amount: parseFloat(pos.usd_amount || 0),
+          swap: 0.00,
+          time: new Date(pos.created_at).toLocaleString(),
+          take_profit: pos.take_profit ? parseFloat(pos.take_profit) : null,
+          stop_loss: pos.stop_loss ? parseFloat(pos.stop_loss) : null
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch trades from Supabase:', err);
+    }
   }
 
   // 5. Generate a deterministic 6-digit account number from user UUID

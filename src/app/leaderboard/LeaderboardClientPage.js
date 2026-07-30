@@ -15,6 +15,17 @@ export default function LeaderboardClientPage({
   trades = [], 
   isFallbackActive = false 
 }) {
+  const formatPnL = (val) => {
+    const num = parseFloat(val || 0);
+    if (num === 0) return '$0.00';
+    const isPositive = num > 0;
+    const formattedVal = Math.abs(num).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    return `${isPositive ? '+' : '-'}$${formattedVal}`;
+  };
+
   const [selectedLeaderboardTab, setSelectedLeaderboardTab] = useState('Global');
   const [availableComps, setAvailableComps] = useState([]);
   const [compRankings, setCompRankings] = useState([]);
@@ -171,7 +182,7 @@ export default function LeaderboardClientPage({
 
   if (selectedLeaderboardTab === 'Global') {
     displayRank = currentUserRank;
-    displayPnLText = `$${currentUserPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    displayPnLText = formatPnL(currentUserPnL);
     displayPnLIsPositive = currentUserPnL >= 0;
   } else {
     const compUserStats = compRankings.find(u => u.user_id === currentUserId);
@@ -288,8 +299,8 @@ export default function LeaderboardClientPage({
                     <span className="text-xs font-bold text-[#111111] truncate max-w-full">
                       {getMaskedName(secondPlace.user_name, secondPlace.user_id)}
                     </span>
-                    <span className="text-[10px] font-bold text-[#16A34A] mt-0.5">
-                      +${secondPlace.total_pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    <span className={`text-[10px] font-bold mt-0.5 ${secondPlace.total_pnl >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {formatPnL(secondPlace.total_pnl)}
                     </span>
                     
                     <div className="w-full bg-[#E5E7EB] border-t-2 border-gray-300 rounded-t-xl h-20 mt-4 hidden sm:flex items-center justify-center shadow-inner">
@@ -314,8 +325,8 @@ export default function LeaderboardClientPage({
                     <span className="text-sm font-bold text-[#111111] truncate max-w-full">
                       {getMaskedName(firstPlace.user_name, firstPlace.user_id)}
                     </span>
-                    <span className="text-xs font-extrabold text-[#16A34A] mt-0.5">
-                      +${firstPlace.total_pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    <span className={`text-xs font-extrabold mt-0.5 ${firstPlace.total_pnl >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {formatPnL(firstPlace.total_pnl)}
                     </span>
                     
                     <div className="w-full bg-[#FCD34D] border-t-2 border-amber-400 rounded-t-xl h-28 mt-4 hidden sm:flex items-center justify-center shadow-inner">
@@ -340,8 +351,8 @@ export default function LeaderboardClientPage({
                     <span className="text-xs font-bold text-[#111111] truncate max-w-full">
                       {getMaskedName(thirdPlace.user_name, thirdPlace.user_id)}
                     </span>
-                    <span className="text-[10px] font-bold text-[#16A34A] mt-0.5">
-                      +${thirdPlace.total_pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    <span className={`text-[10px] font-bold mt-0.5 ${thirdPlace.total_pnl >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {formatPnL(thirdPlace.total_pnl)}
                     </span>
                     
                     <div className="w-full bg-[#E5D5C5] border-t-2 border-amber-600 rounded-t-xl h-16 mt-4 hidden sm:flex items-center justify-center shadow-inner">
@@ -392,7 +403,7 @@ export default function LeaderboardClientPage({
                               )}
                             </td>
                             <td className={`py-4 px-6 font-mono font-bold ${isWinner ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                              {isWinner ? '+' : ''}${user.total_pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatPnL(user.total_pnl)}
                             </td>
                             <td className="py-4 px-6 text-center font-mono font-semibold">{user.win_rate.toFixed(1)}%</td>
                             <td className="py-4 px-6 text-center font-mono font-semibold">{user.total_trades}</td>

@@ -60,8 +60,8 @@ export default function ForgotPasswordPage() {
     const newErrors = {};
     if (!code.trim()) {
       newErrors.code = 'Verification code is required';
-    } else if (code.trim().length !== 6) {
-      newErrors.code = 'Code must be exactly 6 digits';
+    } else if (code.trim().length !== 8) {
+      newErrors.code = 'Code must be exactly 8 digits';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -226,7 +226,7 @@ export default function ForgotPasswordPage() {
           <>
             <div className="mb-6 text-center">
               <h2 className="text-2xl font-bold tracking-tight text-[#111111]">Reset password</h2>
-              <p className="text-sm text-[#6B7280] mt-1">We'll send you a 6-digit code to reset your password</p>
+              <p className="text-sm text-[#6B7280] mt-1">We'll send you an 8-digit code to reset your password</p>
             </div>
 
             {/* API Level Error Banner */}
@@ -294,7 +294,7 @@ export default function ForgotPasswordPage() {
             <div className="mb-6 text-center">
               <h2 className="text-2xl font-bold tracking-tight text-[#111111]">Verify Code</h2>
               <p className="text-sm text-[#6B7280] mt-1 leading-relaxed">
-                Enter the 6-digit code sent to <span className="font-semibold text-[#111111]">{email}</span>
+                Enter the 8-digit code sent to <span className="font-semibold text-[#111111]">{email}</span>
               </p>
             </div>
 
@@ -322,8 +322,8 @@ export default function ForgotPasswordPage() {
                   <Key className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-[#6B7280]" />
                   <input
                     type="text"
-                    maxLength={6}
-                    placeholder="e.g. 123456"
+                    maxLength={8}
+                    placeholder="e.g. 12345678"
                     value={code}
                     onChange={(e) => {
                       setCode(e.target.value.replace(/\D/g, ''));
