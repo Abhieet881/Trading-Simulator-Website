@@ -1,17 +1,25 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase';
 import AdminClientPage from './AdminClientPage';
 
 export const revalidate = 0; // Disable server caching for administrative accuracy
 
 export default async function AdminPage() {
+  // 0. Check admin_verified cookie
+  const cookieStore = await cookies();
+  const isAdminVerified = cookieStore.get('admin_verified')?.value === 'true';
+  if (!isAdminVerified) {
+    redirect('/admin/login');
+  }
+
   const supabase = await createClient();
 
   // 1. Authenticate user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-    redirect('/login');
+    redirect('/admin/login');
   }
 
   const ADMIN_EMAILS = [
@@ -50,8 +58,8 @@ export default async function AdminPage() {
   }
 
   if (!isAdmin) {
-    console.warn(`[Admin] Access denied for: ${user.email} — redirecting to /dashboard`);
-    redirect('/dashboard');
+    console.warn(`[Admin] Access denied for: ${user.email} — redirecting to /admin/login`);
+    redirect('/admin/login?error=Access+denied.+You+are+not+an+administrator.');
   }
 
   // 3. Fetch admin metrics, user lists, and competitions

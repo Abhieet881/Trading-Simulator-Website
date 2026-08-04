@@ -111,8 +111,10 @@ export default function AdminClientPage({
       const res = await fetch('/api/auth/logout', {
         method: 'POST',
       });
+      // Clear the admin verification cookie
+      document.cookie = "admin_verified=; path=/; max-age=0; SameSite=Lax";
       if (res.ok) {
-        window.location.href = '/login';
+        window.location.href = '/admin/login';
       }
     } catch (err) {
       console.error('Logout failed:', err);
