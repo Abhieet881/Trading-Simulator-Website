@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { getActiveWallet } from '@/lib/activeWallet';
+import { formatLotSize } from '@/lib/account';
 import Navbar from '@/components/Navbar';
 import OnboardingBalanceSelector from './OnboardingBalanceSelector';
 
@@ -275,7 +276,7 @@ export default async function DashboardPage() {
                           </span>
                         </td>
                         <td className="py-3 px-3 font-mono tabular-nums text-right">
-                          {(parseFloat(t.quantity) || parseFloat(t.size) || 0).toFixed(2)}
+                          {formatLotSize(t.quantity || t.size)}
                         </td>
                         <td className="py-3 px-3 font-mono tabular-nums text-right">
                           ${parseFloat(t.entry_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}

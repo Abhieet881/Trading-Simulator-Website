@@ -9,6 +9,7 @@ import {
   Trophy, History, Loader2
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { formatLotSize } from '@/lib/account';
 
 export default function HistoryClientPage({ userName, trades = [] }) {
   const [assetFilter, setAssetFilter] = useState('All');
@@ -276,7 +277,7 @@ export default function HistoryClientPage({ userName, trades = [] }) {
                             {pos.side?.toLowerCase() === 'buy' ? 'Buy' : 'Sell'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 font-mono font-medium">{pos.size?.toFixed(2)}</td>
+                        <td className="py-3.5 px-4 font-mono font-medium">{formatLotSize(pos.size)}</td>
                         <td className="py-3.5 px-4 font-mono font-medium">
                           {['EUR/USD', 'GBP/USD'].includes(pos.symbol) ? pos.entry.toFixed(4) : `$${pos.entry.toLocaleString()}`}
                         </td>

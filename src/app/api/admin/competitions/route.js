@@ -15,8 +15,19 @@ async function verifyAdmin(supabase) {
     .eq('id', user.id)
     .single();
 
-  const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
-  let isAdmin = dbUser?.is_admin || ADMIN_EMAILS.includes(user.email);
+  const ADMIN_EMAILS = [
+    'patilabhijeet409@gmail.com',
+    'abhieet881@gmail.com',
+    'abhijeetpatil881@gmail.com',
+    'abhijeet881@gmail.com',
+    'gzabhijeet@gmail.com'
+  ];
+  
+  const emailMatch = ADMIN_EMAILS.some(
+    (e) => e.toLowerCase() === (user.email || '').toLowerCase()
+  );
+  
+  let isAdmin = dbUser?.is_admin === true || emailMatch;
 
   if (!isAdmin) {
     return { error: 'Forbidden', status: 403 };

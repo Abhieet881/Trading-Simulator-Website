@@ -14,7 +14,13 @@ export default async function AdminPage() {
     redirect('/login');
   }
 
-  const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
+  const ADMIN_EMAILS = [
+    'patilabhijeet409@gmail.com',
+    'abhieet881@gmail.com',
+    'abhijeetpatil881@gmail.com',
+    'abhijeet881@gmail.com',
+    'gzabhijeet@gmail.com'
+  ];
   let isAdmin = false;
   try {
     const { data: dbUser, error: dbUserError } = await supabase
@@ -23,13 +29,28 @@ export default async function AdminPage() {
       .eq('id', user.id)
       .single();
 
-    isAdmin = dbUser?.is_admin || ADMIN_EMAILS.includes(user.email);
+    if (dbUserError) {
+      console.warn('[Admin] DB is_admin lookup failed (falling back to email check):', dbUserError.message);
+    }
+
+    const emailMatch = ADMIN_EMAILS.some(
+      (e) => e.toLowerCase() === (user.email || '').toLowerCase()
+    );
+
+    isAdmin = dbUser?.is_admin === true || emailMatch;
+
+    console.log(
+      `[Admin] Auth check — email: ${user.email} | db.is_admin: ${dbUser?.is_admin} | emailMatch: ${emailMatch} | isAdmin: ${isAdmin}`
+    );
   } catch (err) {
-    console.error('Admin privilege check failed, checking fallback:', err);
-    isAdmin = ADMIN_EMAILS.includes(user.email);
+    console.error('[Admin] Unexpected error during admin check:', err);
+    isAdmin = ADMIN_EMAILS.some(
+      (e) => e.toLowerCase() === (user.email || '').toLowerCase()
+    );
   }
 
   if (!isAdmin) {
+    console.warn(`[Admin] Access denied for: ${user.email} — redirecting to /dashboard`);
     redirect('/dashboard');
   }
 

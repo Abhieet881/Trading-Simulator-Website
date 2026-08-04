@@ -21,8 +21,17 @@ export async function PUT(request) {
       .eq('id', user.id)
       .single();
 
-    const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
-    let isAdmin = callerUser?.is_admin || ADMIN_EMAILS.includes(user.email);
+    const ADMIN_EMAILS = [
+      'patilabhijeet409@gmail.com',
+      'abhieet881@gmail.com',
+      'abhijeetpatil881@gmail.com',
+      'abhijeet881@gmail.com',
+      'gzabhijeet@gmail.com'
+    ];
+    const emailMatch = ADMIN_EMAILS.some(
+      (e) => e.toLowerCase() === (user.email || '').toLowerCase()
+    );
+    let isAdmin = callerUser?.is_admin === true || emailMatch;
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -120,8 +129,17 @@ export async function DELETE(request) {
       .eq('id', user.id)
       .single();
 
-    const ADMIN_EMAILS = ['patilabhijeet409@gmail.com', 'abhieet881@gmail.com', 'abhijeetpatil881@gmail.com', 'abhijeet881@gmail.com'];
-    let isAdmin = callerUser?.is_admin || ADMIN_EMAILS.includes(user.email);
+    const ADMIN_EMAILS = [
+      'patilabhijeet409@gmail.com',
+      'abhieet881@gmail.com',
+      'abhijeetpatil881@gmail.com',
+      'abhijeet881@gmail.com',
+      'gzabhijeet@gmail.com'
+    ];
+    const emailMatch = ADMIN_EMAILS.some(
+      (e) => e.toLowerCase() === (user.email || '').toLowerCase()
+    );
+    let isAdmin = callerUser?.is_admin === true || emailMatch;
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
